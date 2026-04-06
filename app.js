@@ -57,12 +57,8 @@ let pendingSave = false;
 /* ── Boot ─────────────────────────────────────────── */
 window.addEventListener('load', async () => {
   showAuth('loading', 'Initializing…');
-  try {
-    await Drive.init();
-    showAuth('signIn');
-  } catch(e) {
-    showAuth('error', 'Failed to initialize Google API. Check your config.js credentials.');
-  }
+  await Drive.init();
+  showAuth('signIn');
   populateKnownTests();
 });
 
