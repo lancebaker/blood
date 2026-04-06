@@ -1,21 +1,27 @@
 /* ── drive.js — Google Drive API layer ───────────────
-   Uses direct fetch() calls against the Drive REST API
-   rather than gapi.client.drive, which is more reliable
-   in static hosting environments.
+   Uses direct fetch() calls against the Drive REST API.
+   Persists session in localStorage so the user stays
+   signed in on a specific device/browser.
    ───────────────────────────────────────────────────── */
 
 const Drive = (() => {
   let tokenClient = null;
   let accessToken = null;
+  let tokenExpiry = null;
   let folderId = null;
   let dataFileId = null;
   let driveFolderUrl = null;
 
   const API = 'https://www.googleapis.com/drive/v3';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
+  const SESSION_KEY = 'labtrack_session';
 
   /* ── Authenticated fetch helper ───────────────────── */
   async function gfetch(url, opts = {}) {
+    // Silently refresh token if it's close to expiry
+    if (tokenExpiry && Date.now() > tokenExpiry - 60000) {
+      await silentRefresh();
+    }
     const res = await fetch(url, {
       ...opts,
       headers: {
@@ -31,17 +37,74 @@ const Drive = (() => {
     try { return text ? JSON.parse(text) : {}; } catch(e) { return {}; }
   }
 
-  /* ── Init ─────────────────────────────────────────── */
-  async function init() {
-    return new Promise((resolve) => {
-      if (typeof gapi !== 'undefined') { resolve(); return; }
-      const check = setInterval(() => {
-        if (typeof gapi !== 'undefined') { clearInterval(check); resolve(); }
-      }, 100);
+  /* ── Session persistence ──────────────────────────── */
+  function saveSession(token, expiresIn) {
+    const expiry = Date.now() + (expiresIn * 1000);
+    tokenExpiry = expiry;
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ token, expiry }));
+  }
+
+  function loadSession() {
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) return null;
+      const { token, expiry } = JSON.parse(raw);
+      // Don't restore if expired
+      if (Date.now() > expiry) { localStorage.removeItem(SESSION_KEY); return null; }
+      return { token, expiry };
+    } catch(e) { return null; }
+  }
+
+  function clearSession() {
+    localStorage.removeItem(SESSION_KEY);
+    tokenExpiry = null;
+  }
+
+  /* ── Silent refresh using stored hint ────────────────
+     Google's token client supports prompt='' which skips
+     the consent screen if the user has previously granted
+     access. Combined with select_account hint, this gives
+     a seamless re-auth on page load.
+   ───────────────────────────────────────────────────── */
+  async function silentRefresh() {
+    return new Promise((resolve, reject) => {
+      const storedHint = localStorage.getItem('labtrack_email') || '';
+      const tc = google.accounts.oauth2.initTokenClient({
+        client_id: CONFIG.CLIENT_ID,
+        scope: CONFIG.SCOPES,
+        hint: storedHint,
+        callback: (resp) => {
+          if (resp.error) { reject(new Error(resp.error)); return; }
+          accessToken = resp.access_token;
+          saveSession(resp.access_token, resp.expires_in || 3600);
+          resolve(resp.access_token);
+        },
+      });
+      tc.requestAccessToken({ prompt: '' });
     });
   }
 
-  /* ── Auth ─────────────────────────────────────────── */
+  /* ── Init — check for stored session ─────────────── */
+  async function init() {
+    // Wait for Google Identity Services to load
+    await new Promise((resolve) => {
+      if (typeof google !== 'undefined' && google.accounts) { resolve(); return; }
+      const check = setInterval(() => {
+        if (typeof google !== 'undefined' && google.accounts) { clearInterval(check); resolve(); }
+      }, 100);
+    });
+
+    // Check for a stored valid session
+    const session = loadSession();
+    if (session) {
+      accessToken = session.token;
+      tokenExpiry = session.expiry;
+      return true; // has session
+    }
+    return false; // needs sign in
+  }
+
+  /* ── Sign in ──────────────────────────────────────── */
   function initTokenClient(callback) {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: CONFIG.CLIENT_ID,
@@ -49,19 +112,51 @@ const Drive = (() => {
       callback: (resp) => {
         if (resp.error) { callback(null, resp.error); return; }
         accessToken = resp.access_token;
+        saveSession(resp.access_token, resp.expires_in || 3600);
+        // Store email hint for silent refresh
+        getUserEmail().then(email => {
+          if (email) localStorage.setItem('labtrack_email', email);
+        });
         callback(resp.access_token, null);
       },
     });
   }
 
   async function signIn() {
+    // First try a silent refresh (no UI prompt)
+    try {
+      await silentRefresh();
+      return accessToken;
+    } catch(e) {
+      // Silent failed — show the full Google sign-in UI
+    }
     return new Promise((resolve, reject) => {
       initTokenClient((token, err) => {
         if (err) reject(new Error(err));
         else resolve(token);
       });
-      tokenClient.requestAccessToken({ prompt: '' });
+      tokenClient.requestAccessToken({ prompt: 'select_account' });
     });
+  }
+
+  /* ── Get user email for hint ──────────────────────── */
+  async function getUserEmail() {
+    try {
+      const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      const json = await res.json();
+      return json.email || null;
+    } catch(e) { return null; }
+  }
+
+  async function getUserInfo() {
+    try {
+      const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      return await res.json();
+    } catch(e) { return null; }
   }
 
   function signOut() {
@@ -69,6 +164,8 @@ const Drive = (() => {
     accessToken = null;
     folderId = null;
     dataFileId = null;
+    clearSession();
+    localStorage.removeItem('labtrack_email');
   }
 
   function isSignedIn() { return !!accessToken; }
@@ -168,7 +265,6 @@ const Drive = (() => {
 
     const q = encodeURIComponent(`name='${filename}' and '${folderId}' in parents and trashed=false`);
     const existing = await gfetch(`${API}/files?q=${q}&fields=files(id)`);
-
     const boundary = 'labtrack_boundary';
 
     if (existing.files && existing.files.length > 0) {
@@ -210,6 +306,6 @@ const Drive = (() => {
     init, signIn, signOut, isSignedIn,
     ensureFolder, getFolderUrl, getFolderId,
     loadDataFile, saveDataFile, deleteDataFile,
-    uploadCSV, listCSVFiles,
+    uploadCSV, listCSVFiles, getUserInfo,
   };
 })();

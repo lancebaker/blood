@@ -342,3 +342,65 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   .summary-bar { grid-template-columns: repeat(2, 1fr); }
   .drive-folder-card { flex-wrap: wrap; }
 }
+
+/* ── Test info panel ──────────────────────────────── */
+.test-info-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.info-panel-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-3);
+  margin-bottom: 1rem;
+}
+
+.info-section {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.info-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.info-label {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-3);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-label::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-3);
+  flex-shrink: 0;
+}
+
+.high-label { color: var(--danger); }
+.high-label::before { background: var(--danger); }
+
+.low-label { color: var(--warn); }
+.low-label::before { background: var(--warn); }
+
+.info-text {
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.7;
+}
