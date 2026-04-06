@@ -195,19 +195,110 @@ function handleDrop(e) {
   handleFileUpload({ files, value: '' });
 }
 
+/* ── Test name normalizer ─────────────────────────────
+   Maps common lab report names to the canonical names
+   used by the reference ranges table.
+   ───────────────────────────────────────────────────── */
+const TEST_NAME_MAP = {
+  // Cholesterol / lipids
+  'cholesterol':              'Total Cholesterol',
+  'total cholesterol':        'Total Cholesterol',
+  'hdl cholesterol':          'HDL',
+  'hdl-c':                    'HDL',
+  'hdl':                      'HDL',
+  'ldl cholesterol':          'LDL',
+  'ldl cholesterol (calc)':   'LDL',
+  'ldl-c':                    'LDL',
+  'ldl':                      'LDL',
+  'triglycerides':            'Triglycerides',
+  'trig':                     'Triglycerides',
+  'non-hdl cholesterol':      'Total Cholesterol', // closest mapping
+  'chol/hdl ratio':           'Chol/HDL Ratio',   // tracked without range
+  // Blood sugar
+  'glucose':                  'Glucose',
+  'fasting glucose':          'Glucose',
+  'hba1c':                    'HbA1c',
+  'hemoglobin a1c':           'HbA1c',
+  'insulin':                  'Insulin',
+  // Thyroid
+  'tsh':                      'TSH',
+  'free t4':                  'Free T4',
+  'free thyroxine':           'Free T4',
+  'free t3':                  'Free T3',
+  // Blood count
+  'hemoglobin':               'Hemoglobin',
+  'hgb':                      'Hemoglobin',
+  'hematocrit':               'Hematocrit',
+  'hct':                      'Hematocrit',
+  'wbc':                      'WBC',
+  'white blood cell':         'WBC',
+  'platelets':                'Platelets',
+  'plt':                      'Platelets',
+  'rbc':                      'RBC',
+  'red blood cell':           'RBC',
+  'ferritin':                 'Ferritin',
+  // Kidney
+  'creatinine':               'Creatinine',
+  'egfr':                     'eGFR',
+  'estimated gfr':            'eGFR',
+  'bun':                      'BUN',
+  'blood urea nitrogen':      'BUN',
+  // Liver
+  'alt':                      'ALT',
+  'alanine aminotransferase': 'ALT',
+  'ast':                      'AST',
+  'aspartate aminotransferase':'AST',
+  'ggt':                      'GGT',
+  'albumin':                  'Albumin',
+  // Vitamins & minerals
+  'vitamin d':                'Vitamin D',
+  'vitamin d, 25-oh':         'Vitamin D',
+  '25-hydroxyvitamin d':      'Vitamin D',
+  'vitamin b12':              'Vitamin B12',
+  'b12':                      'Vitamin B12',
+  'folate':                   'Folate',
+  'magnesium':                'Magnesium',
+  'calcium':                  'Calcium',
+  'potassium':                'Potassium',
+  'sodium':                   'Sodium',
+  'iron':                     'Iron',
+  'zinc':                     'Zinc',
+  // Hormones
+  'testosterone':             'Testosterone',
+  'testosterone, total':      'Testosterone',
+  'estradiol':                'Estradiol',
+  'cortisol':                 'Cortisol',
+  'dhea-s':                   'DHEA-S',
+  'dhea sulfate':             'DHEA-S',
+  'psa':                      'PSA',
+  // Inflammation
+  'crp':                      'CRP',
+  'c-reactive protein':       'CRP',
+  'hs-crp':                   'CRP',
+  'homocysteine':             'Homocysteine',
+  'uric acid':                'Uric Acid',
+};
+
+function normalizeTestName(raw) {
+  const key = raw.toLowerCase().trim();
+  return TEST_NAME_MAP[key] || raw.trim(); // fall back to original if no match
+}
+
 function parseAndMergeCSV(text, filename) {
   const logs = [];
   const lines = text.trim().split(/\r?\n/);
   if (lines.length < 2) { logs.push({ type: 'err', msg: `${filename}: empty or no data rows` }); return logs; }
 
   const headers = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
-  const dateIdx = headers.findIndex(h => h === 'date');
-  const nameIdx = headers.findIndex(h => h === 'test_name');
-  const valIdx  = headers.findIndex(h => h === 'value');
-  const unitIdx = headers.findIndex(h => h === 'unit');
+
+  // Flexible column detection — handles multiple lab export formats
+  const dateIdx = headers.findIndex(h => ['date', 'collection date', 'result date', 'collected', 'drawn date', 'test date'].includes(h));
+  const nameIdx = headers.findIndex(h => ['test_name', 'test', 'test name', 'analyte', 'component', 'description'].includes(h));
+  const valIdx  = headers.findIndex(h => ['value', 'result', 'result value', 'numeric result'].includes(h));
+  const unitIdx = headers.findIndex(h => ['unit', 'units', 'unit of measure', 'uom'].includes(h));
 
   if (dateIdx < 0 || nameIdx < 0 || valIdx < 0) {
-    logs.push({ type: 'err', msg: `${filename}: missing required columns (date, test_name, value)` });
+    logs.push({ type: 'err', msg: `${filename}: missing required columns. Found: [${headers.join(', ')}]. Need: date, test name, value.` });
     return logs;
   }
 
@@ -216,24 +307,45 @@ function parseAndMergeCSV(text, filename) {
     const line = lines[i].trim();
     if (!line) continue;
     const cols = parseCSVLine(line);
-    const date  = (cols[dateIdx] || '').trim();
-    const name  = (cols[nameIdx] || '').trim();
-    const rawV  = (cols[valIdx]  || '').trim();
-    const unit  = unitIdx >= 0 ? (cols[unitIdx] || '').trim() : '';
+    const rawDate = (cols[dateIdx] || '').trim();
+    const rawName = (cols[nameIdx] || '').trim();
+    const rawV    = (cols[valIdx]  || '').trim();
+    const unit    = unitIdx >= 0 ? (cols[unitIdx] || '').trim() : '';
 
-    if (!date || !name || !rawV) { skipped++; continue; }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { skipped++; continue; }
+    if (!rawDate || !rawName || !rawV) { skipped++; continue; }
+
+    // Normalize date to YYYY-MM-DD
+    const date = normalizeDate(rawDate);
+    if (!date) { skipped++; continue; }
+
     const value = parseFloat(rawV);
     if (isNaN(value)) { skipped++; continue; }
 
-    const idx = db.findIndex(r => r.date === date && r.test_name === name);
-    if (idx >= 0) { db[idx] = { date, test_name: name, value, unit }; updated++; }
-    else          { db.push({ date, test_name: name, value, unit });   added++;   }
+    const test_name = normalizeTestName(rawName);
+
+    const idx = db.findIndex(r => r.date === date && r.test_name === test_name);
+    if (idx >= 0) { db[idx] = { date, test_name, value, unit }; updated++; }
+    else          { db.push({ date, test_name, value, unit });   added++;   }
   }
 
   db.sort((a, b) => a.date.localeCompare(b.date));
   logs.push({ type: 'ok', msg: `${filename}: ${added} rows added, ${updated} updated, ${skipped} skipped` });
   return logs;
+}
+
+function normalizeDate(raw) {
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  // MM/DD/YYYY
+  const mdy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mdy) return `${mdy[3]}-${mdy[1].padStart(2,'0')}-${mdy[2].padStart(2,'0')}`;
+  // MM-DD-YYYY
+  const mdy2 = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (mdy2) return `${mdy2[3]}-${mdy2[1].padStart(2,'0')}-${mdy2[2].padStart(2,'0')}`;
+  // Try native Date parse as fallback
+  const d = new Date(raw);
+  if (!isNaN(d)) return d.toISOString().slice(0, 10);
+  return null;
 }
 
 function parseCSVLine(line) {
