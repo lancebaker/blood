@@ -1,8 +1,7 @@
 /* ── drive.js — Google Drive API layer ───────────────
-   Handles all OAuth and Drive file operations.
-   The app only ever touches files inside its own folder
-   (scope: drive.file), so no other Drive content is
-   accessible to LabTrack.
+   Uses direct fetch() calls against the Drive REST API
+   rather than gapi.client.drive, which is more reliable
+   in static hosting environments.
    ───────────────────────────────────────────────────── */
 
 const Drive = (() => {
@@ -12,29 +11,44 @@ const Drive = (() => {
   let dataFileId = null;
   let driveFolderUrl = null;
 
+  const API = 'https://www.googleapis.com/drive/v3';
+  const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
+
+  /* ── Authenticated fetch helper ───────────────────── */
+  async function gfetch(url, opts = {}) {
+    const res = await fetch(url, {
+      ...opts,
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        ...(opts.headers || {}),
+      },
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Drive API error ${res.status}: ${err}`);
+    }
+    const text = await res.text();
+    try { return text ? JSON.parse(text) : {}; } catch(e) { return {}; }
+  }
+
   /* ── Init ─────────────────────────────────────────── */
   async function init() {
-    return new Promise((resolve, reject) => {
-      gapi.load('client', async () => {
-        try {
-          await gapi.client.init({
-            apiKey: CONFIG.API_KEY,
-            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-          });
-          resolve();
-        } catch(e) { reject(e); }
-      });
+    return new Promise((resolve) => {
+      if (typeof gapi !== 'undefined') { resolve(); return; }
+      const check = setInterval(() => {
+        if (typeof gapi !== 'undefined') { clearInterval(check); resolve(); }
+      }, 100);
     });
   }
 
+  /* ── Auth ─────────────────────────────────────────── */
   function initTokenClient(callback) {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: CONFIG.CLIENT_ID,
       scope: CONFIG.SCOPES,
-      callback: async (resp) => {
+      callback: (resp) => {
         if (resp.error) { callback(null, resp.error); return; }
         accessToken = resp.access_token;
-        gapi.client.setToken({ access_token: accessToken });
         callback(resp.access_token, null);
       },
     });
@@ -46,18 +60,15 @@ const Drive = (() => {
         if (err) reject(new Error(err));
         else resolve(token);
       });
-      tokenClient.requestAccessToken({ prompt: 'consent' });
+      tokenClient.requestAccessToken({ prompt: '' });
     });
   }
 
   function signOut() {
-    if (accessToken) {
-      google.accounts.oauth2.revoke(accessToken, () => {});
-    }
+    if (accessToken) google.accounts.oauth2.revoke(accessToken, () => {});
     accessToken = null;
     folderId = null;
     dataFileId = null;
-    gapi.client.setToken(null);
   }
 
   function isSignedIn() { return !!accessToken; }
@@ -66,64 +77,52 @@ const Drive = (() => {
   async function ensureFolder() {
     if (folderId) return folderId;
 
-    // Search for existing folder
-    const res = await gapi.client.drive.files.list({
-      q: `name='${CONFIG.DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-      fields: 'files(id,name,webViewLink)',
-      spaces: 'drive',
-    });
+    const q = encodeURIComponent(`name='${CONFIG.DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+    const res = await gfetch(`${API}/files?q=${q}&fields=files(id,name,webViewLink)&spaces=drive`);
 
-    if (res.result.files.length > 0) {
-      folderId = res.result.files[0].id;
-      driveFolderUrl = res.result.files[0].webViewLink;
+    if (res.files && res.files.length > 0) {
+      folderId = res.files[0].id;
+      driveFolderUrl = res.files[0].webViewLink;
       return folderId;
     }
 
-    // Create folder
-    const create = await gapi.client.drive.files.create({
-      resource: {
+    const created = await gfetch(`${API}/files?fields=id,webViewLink`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         name: CONFIG.DRIVE_FOLDER_NAME,
         mimeType: 'application/vnd.google-apps.folder',
-      },
-      fields: 'id,webViewLink',
+      }),
     });
 
-    folderId = create.result.id;
-    driveFolderUrl = create.result.webViewLink;
+    folderId = created.id;
+    driveFolderUrl = created.webViewLink;
     return folderId;
   }
 
   function getFolderUrl() { return driveFolderUrl; }
   function getFolderId() { return folderId; }
 
-  /* ── Data file (labtrack-data.json) ───────────────── */
+  /* ── Data file ────────────────────────────────────── */
   async function loadDataFile() {
     await ensureFolder();
 
-    // Find existing data file
-    const res = await gapi.client.drive.files.list({
-      q: `name='${CONFIG.DATA_FILE_NAME}' and '${folderId}' in parents and trashed=false`,
-      fields: 'files(id)',
-    });
+    const q = encodeURIComponent(`name='${CONFIG.DATA_FILE_NAME}' and '${folderId}' in parents and trashed=false`);
+    const res = await gfetch(`${API}/files?q=${q}&fields=files(id)`);
 
-    if (res.result.files.length === 0) {
+    if (!res.files || res.files.length === 0) {
       dataFileId = null;
       return null;
     }
 
-    dataFileId = res.result.files[0].id;
+    dataFileId = res.files[0].id;
 
-    // Download contents
-    const content = await gapi.client.drive.files.get({
-      fileId: dataFileId,
-      alt: 'media',
+    const content = await fetch(`${API}/files/${dataFileId}?alt=media`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
     });
 
-    try {
-      return JSON.parse(content.body);
-    } catch(e) {
-      return null;
-    }
+    const text = await content.text();
+    try { return JSON.parse(text); } catch(e) { return null; }
   }
 
   async function saveDataFile(data) {
@@ -131,8 +130,7 @@ const Drive = (() => {
     const body = JSON.stringify(data, null, 2);
 
     if (dataFileId) {
-      // Update existing file
-      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${dataFileId}?uploadType=media`, {
+      await fetch(`${UPLOAD}/files/${dataFileId}?uploadType=media`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -141,16 +139,17 @@ const Drive = (() => {
         body,
       });
     } else {
-      // Create new file
-      const meta = { name: CONFIG.DATA_FILE_NAME, parents: [folderId] };
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
-      form.append('file', new Blob([body], { type: 'application/json' }));
+      const boundary = 'labtrack_boundary';
+      const meta = JSON.stringify({ name: CONFIG.DATA_FILE_NAME, parents: [folderId] });
+      const multipart = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
 
-      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+      const res = await fetch(`${UPLOAD}/files?uploadType=multipart&fields=id`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${accessToken}` },
-        body: form,
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': `multipart/related; boundary=${boundary}`,
+        },
+        body: multipart,
       });
       const json = await res.json();
       dataFileId = json.id;
@@ -159,59 +158,52 @@ const Drive = (() => {
 
   async function deleteDataFile() {
     if (!dataFileId) return;
-    await gapi.client.drive.files.delete({ fileId: dataFileId });
+    await gfetch(`${API}/files/${dataFileId}`, { method: 'DELETE' });
     dataFileId = null;
   }
 
-  /* ── CSV file upload to Drive ─────────────────────── */
+  /* ── CSV upload ───────────────────────────────────── */
   async function uploadCSV(filename, content) {
     await ensureFolder();
 
-    // Check if a file with this name already exists in the folder
-    const existing = await gapi.client.drive.files.list({
-      q: `name='${filename}' and '${folderId}' in parents and trashed=false`,
-      fields: 'files(id)',
-    });
+    const q = encodeURIComponent(`name='${filename}' and '${folderId}' in parents and trashed=false`);
+    const existing = await gfetch(`${API}/files?q=${q}&fields=files(id)`);
 
-    const meta = { name: filename, parents: [folderId] };
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
-    form.append('file', new Blob([content], { type: 'text/csv' }));
+    const boundary = 'labtrack_boundary';
 
-    if (existing.result.files.length > 0) {
-      // Update existing (remove parent metadata for update)
-      const existingId = existing.result.files[0].id;
-      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart`, {
+    if (existing.files && existing.files.length > 0) {
+      const existingId = existing.files[0].id;
+      await fetch(`${UPLOAD}/files/${existingId}?uploadType=media`, {
         method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${accessToken}` },
-        body: (() => {
-          const f = new FormData();
-          f.append('metadata', new Blob([JSON.stringify({ name: filename })], { type: 'application/json' }));
-          f.append('file', new Blob([content], { type: 'text/csv' }));
-          return f;
-        })(),
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'text/csv',
+        },
+        body: content,
       });
       return existingId;
     }
 
-    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    const meta = JSON.stringify({ name: filename, parents: [folderId] });
+    const multipart = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: text/csv\r\n\r\n${content}\r\n--${boundary}--`;
+
+    const res = await fetch(`${UPLOAD}/files?uploadType=multipart&fields=id`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}` },
-      body: form,
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`,
+      },
+      body: multipart,
     });
     const json = await res.json();
     return json.id;
   }
 
-  /* ── List CSV files in the LabTrack folder ────────── */
   async function listCSVFiles() {
     await ensureFolder();
-    const res = await gapi.client.drive.files.list({
-      q: `'${folderId}' in parents and name contains '.csv' and trashed=false`,
-      fields: 'files(id,name,modifiedTime)',
-      orderBy: 'modifiedTime desc',
-    });
-    return res.result.files || [];
+    const q = encodeURIComponent(`'${folderId}' in parents and name contains '.csv' and trashed=false`);
+    const res = await gfetch(`${API}/files?q=${q}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`);
+    return res.files || [];
   }
 
   return {
