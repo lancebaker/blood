@@ -350,14 +350,17 @@ function normalizeDate(raw) {
 
 function parseCSVLine(line) {
   const cols = [];
-  let cur = '', inQ = false;
-  for (let i = 0; i < line.length; i++) {
+  let cur = '', inQ = false, i = 0;
+  while (i < line.length) {
     const c = line[i];
-    if (c === '"') { inQ = !inQ; continue; }
-    if (c === ',' && !inQ) { cols.push(cur); cur = ''; continue; }
-    cur += c;
+    if (c === '"') {
+      if (inQ && line[i+1] === '"') { cur += '"'; i += 2; continue; } // escaped quote
+      inQ = !inQ; i++; continue;
+    }
+    if (c === ',' && !inQ) { cols.push(cur.trim()); cur = ''; i++; continue; }
+    cur += c; i++;
   }
-  cols.push(cur);
+  cols.push(cur.trim());
   return cols;
 }
 
