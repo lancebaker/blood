@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>LabTrack</title>
+  <meta name="description" content="Personal blood lab tracker — synced via Google Drive" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="LabTrack" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ── Auth Screen ─────────────────────────────────── -->
+<div id="authScreen" class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+        <rect width="40" height="40" rx="10" fill="#1a1a2e"/>
+        <path d="M8 28 L13 14 L18 22 L23 17 L28 24 L32 28" stroke="#4fffb0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <circle cx="13" cy="14" r="2.5" fill="#4fffb0"/>
+        <circle cx="18" cy="22" r="2.5" fill="#4fffb0"/>
+        <circle cx="23" cy="17" r="2.5" fill="#4fffb0"/>
+        <circle cx="28" cy="24" r="2.5" fill="#4fffb0"/>
+      </svg>
+    </div>
+    <h1 class="auth-title">LabTrack</h1>
+    <p class="auth-sub">Blood lab results — synced across all your devices</p>
+
+    <div id="authSignIn" class="auth-panel">
+      <button class="btn-google" id="signInBtn" onclick="signIn()">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
+          <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.909-2.259c-.806.54-1.837.86-3.047.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+          <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+          <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+        </svg>
+        Sign in with Google
+      </button>
+      <p class="auth-note">
+        LabTrack only requests access to files <em>it creates</em> in your Drive.<br>
+        Your other Drive files are never visible to the app.
+      </p>
+    </div>
+
+    <div id="authLoading" class="auth-panel" style="display:none">
+      <div class="auth-spinner"></div>
+      <p class="auth-loading-text" id="authLoadingText">Connecting to Google Drive…</p>
+    </div>
+
+    <div id="authError" class="auth-panel" style="display:none">
+      <p class="auth-error-msg" id="authErrorMsg"></p>
+      <button class="btn-google" onclick="signIn()">Try again</button>
+    </div>
+
+    <p class="auth-footer">Data stored in your Google Drive · Never shared</p>
+  </div>
+</div>
+
+<!-- ── App Shell ───────────────────────────────────── -->
+<div id="appShell" class="app-shell" style="display:none">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <svg width="20" height="20" viewBox="0 0 40 40" fill="none">
+          <rect width="40" height="40" rx="10" fill="#1a1a2e"/>
+          <path d="M8 28 L13 14 L18 22 L23 17 L28 24 L32 28" stroke="#4fffb0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <circle cx="13" cy="14" r="2.5" fill="#4fffb0"/>
+          <circle cx="18" cy="22" r="2.5" fill="#4fffb0"/>
+          <circle cx="23" cy="17" r="2.5" fill="#4fffb0"/>
+          <circle cx="28" cy="24" r="2.5" fill="#4fffb0"/>
+        </svg>
+        <span>LabTrack</span>
+      </div>
+      <button class="sidebar-close" onclick="closeSidebar()">✕</button>
+    </div>
+
+    <div class="user-chip" id="userChip"></div>
+
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-view="dashboard" onclick="switchView('dashboard',this)">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="1" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.3"/><rect x="1" y="9" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.3"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-item" data-view="trends" onclick="switchView('trends',this)">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M1 12 L5 7 L8 10 L11 5 L15 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Trends
+      </button>
+      <button class="nav-item" data-view="history" onclick="switchView('history',this)">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 1v4M11 1v4M2 7h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        History
+      </button>
+      <button class="nav-item" data-view="import" onclick="switchView('import',this)">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 7l3 3 3-3M3 12v1.5A1.5 1.5 0 0 0 4.5 15h7a1.5 1.5 0 0 0 1.5-1.5V12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Import
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sync-status" id="syncStatus">
+        <span class="sync-dot" id="syncDot"></span>
+        <span id="syncLabel">Synced</span>
+      </div>
+      <button class="nav-item" onclick="syncNow()" title="Sync now">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M14 8A6 6 0 1 1 8 2M14 2v4h-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Sync now
+      </button>
+      <button class="nav-item danger" onclick="signOut()">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M11 11l3-3-3-3M14 8H6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Sign out
+      </button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="top-bar">
+      <button class="menu-btn" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
+      <div class="top-bar-title" id="viewTitle">Dashboard</div>
+      <div class="top-bar-actions">
+        <label class="icon-btn" for="quickUpload" title="Upload CSV">
+          <svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 5l3-3 3 3M3 12v1.5A1.5 1.5 0 0 0 4.5 15h7a1.5 1.5 0 0 0 1.5-1.5V12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <input type="file" id="quickUpload" accept=".csv" multiple style="display:none" onchange="handleFileUpload(this)" />
+        </label>
+      </div>
+    </header>
+
+    <!-- DASHBOARD -->
+    <section class="view active" id="view-dashboard">
+      <div class="view-inner">
+        <div class="summary-bar" id="summaryBar"></div>
+        <div class="cat-filter" id="catFilter"></div>
+        <div class="test-grid" id="testGrid"></div>
+        <div class="empty-dashboard" id="emptyDash">
+          <div class="empty-icon">◎</div>
+          <p>No lab data yet.</p>
+          <p class="empty-sub">Drop a CSV into your LabTrack folder on Google Drive, or use the Import tab.</p>
+          <button class="btn-primary" onclick="switchView('import',document.querySelector('[data-view=import]'))">Go to Import</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TRENDS -->
+    <section class="view" id="view-trends">
+      <div class="view-inner">
+        <div class="trends-select-wrap">
+          <label class="field-label">Select test</label>
+          <select id="trendTestSelect" onchange="renderTrendChart()" class="field-select">
+            <option value="">— choose a test —</option>
+          </select>
+        </div>
+        <div id="trendChartWrap" style="display:none">
+          <div class="trend-meta" id="trendMeta"></div>
+          <div class="chart-container"><canvas id="trendChart"></canvas></div>
+          <div class="reference-bar" id="referenceBar"></div>
+          <div id="trendHistory"></div>
+        </div>
+        <div class="empty-dashboard" id="emptyTrends">
+          <div class="empty-icon">◎</div>
+          <p>Select a test above to view its trend.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="view" id="view-history">
+      <div class="view-inner">
+        <div class="history-controls">
+          <input type="text" id="historySearch" class="field-input" placeholder="Search tests…" oninput="renderHistory()" />
+          <select id="historyDateFilter" class="field-select" onchange="renderHistory()">
+            <option value="all">All dates</option>
+            <option value="6m">Last 6 months</option>
+            <option value="1y">Last year</option>
+            <option value="2y">Last 2 years</option>
+          </select>
+        </div>
+        <div id="historyTable"></div>
+        <div class="empty-dashboard" id="emptyHistory">
+          <div class="empty-icon">◎</div><p>No lab data yet.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- IMPORT -->
+    <section class="view" id="view-import">
+      <div class="view-inner">
+
+        <div class="drive-folder-card" id="driveFolderCard">
+          <div class="dfc-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke="#4fffb0" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="dfc-text">
+            <p class="dfc-title">Google Drive folder</p>
+            <p class="dfc-path" id="driveFolderPath">LabTrack/</p>
+          </div>
+          <button class="btn-ghost" onclick="openDriveFolder()">Open in Drive ↗</button>
+        </div>
+
+        <div class="import-zone" id="importZone"
+             onclick="document.getElementById('importInput').click()"
+             ondragover="event.preventDefault();this.classList.add('drag-over')"
+             ondragleave="this.classList.remove('drag-over')"
+             ondrop="handleDrop(event)">
+          <div class="import-icon">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M14 4v16M8 10l6-6 6 6M4 20v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2" stroke="#4fffb0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <p class="import-title">Upload CSV files</p>
+          <p class="import-sub">Files are saved to your Drive folder and parsed automatically</p>
+          <input type="file" id="importInput" accept=".csv" multiple style="display:none" onchange="handleFileUpload(this)" />
+        </div>
+
+        <div class="format-card">
+          <div class="format-header">
+            <span class="format-tag">CSV FORMAT</span>
+            <button class="btn-ghost" onclick="downloadSampleCSV()">Download sample ↓</button>
+          </div>
+          <div class="format-table-wrap">
+            <table class="format-table">
+              <thead><tr><th>date</th><th>test_name</th><th>value</th><th>unit</th></tr></thead>
+              <tbody>
+                <tr><td>2024-03-15</td><td>Glucose</td><td>95</td><td>mg/dL</td></tr>
+                <tr><td>2024-03-15</td><td>LDL</td><td>118</td><td>mg/dL</td></tr>
+                <tr><td>2024-09-20</td><td>Vitamin D</td><td>32</td><td>ng/mL</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="format-note">Date must be YYYY-MM-DD. Headers are required. Unrecognized test names are tracked without reference ranges.</p>
+        </div>
+
+        <div class="known-tests-card">
+          <div class="format-header"><span class="format-tag">KNOWN TESTS WITH REFERENCE RANGES</span></div>
+          <div class="known-tests-grid" id="knownTestsGrid"></div>
+        </div>
+
+        <div id="importLog" class="import-log" style="display:none"></div>
+
+        <div class="danger-zone">
+          <div>
+            <p class="danger-label">Clear all parsed data</p>
+            <p style="font-size:12px;color:var(--text-3);margin-top:2px">Removes the labtrack-data.json from Drive. Your CSV files are untouched.</p>
+          </div>
+          <button class="btn-danger" onclick="clearAllData()">Clear data</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Overlay for sidebar on mobile -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Google API -->
+<script src="https://apis.google.com/js/api.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="config.js"></script>
+<script src="drive.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
