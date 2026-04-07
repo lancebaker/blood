@@ -284,29 +284,10 @@ function showAuth(panel, msg = '') {
 }
 
 async function signIn() {
-  showAuth('loading', 'Waiting for Google sign-in…');
-  try {
-    await Drive.signIn();
-    showAuth('loading', 'Loading your lab data from Drive…');
-    await afterSignIn();
-  } catch(e) {
-    // User closed the popup — go back to sign-in screen quietly
-    if (e.message === 'Sign-in cancelled') {
-      showAuth('signIn');
-      return;
-    }
-    // Google API not ready yet
-    if (e.message && e.message.includes('not ready')) {
-      showAuth('error', 'Google sign-in is still loading. Please wait a moment and try again.');
-      return;
-    }
-    // Popup was blocked by the browser (common on desktop with strict settings)
-    if (e.message && (e.message.includes('popup') || e.message.includes('blocked'))) {
-      showAuth('error', 'Pop-ups are blocked in your browser. Please allow pop-ups for this site and try again, or try in an incognito window.');
-      return;
-    }
-    showAuth('error', 'Sign-in failed. Please try again. (' + (e.message || e) + ')');
-  }
+  // Redirect flow — this navigates away from the page.
+  // The user is sent to Google, approves, and comes back.
+  showAuth('loading', 'Redirecting to Google…');
+  Drive.signIn(); // triggers redirect, page navigates away
 }
 
 async function afterSignIn() {

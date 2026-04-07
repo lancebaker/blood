@@ -1,285 +1,188 @@
 /* ── drive.js — Google Drive API layer ───────────────
-   Uses direct fetch() calls against the Drive REST API.
-   Persists session in localStorage so the user stays
-   signed in on a specific device/browser.
+   Uses redirect-based OAuth (no popups) so it works
+   on all browsers and devices without permission issues.
+   Data stored in user's own Google Drive.
    ───────────────────────────────────────────────────── */
 
 const Drive = (() => {
-  let tokenClient = null;
   let accessToken = null;
   let tokenExpiry = null;
   let folderId = null;
   let dataFileId = null;
   let driveFolderUrl = null;
 
-  const API = 'https://www.googleapis.com/drive/v3';
+  const API    = 'https://www.googleapis.com/drive/v3';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
-  const SESSION_KEY = 'labtrack_session';
+  const TOKEN_KEY   = 'labtrack_token';
+  const EXPIRY_KEY  = 'labtrack_expiry';
+  const EMAIL_KEY   = 'labtrack_email';
 
-  /* ── Authenticated fetch helper ───────────────────── */
-  async function gfetch(url, opts = {}) {
-    // Silently refresh token if it's close to expiry
-    if (tokenExpiry && Date.now() > tokenExpiry - 60000) {
-      await silentRefresh();
+  /* ── Token storage ────────────────────────────────── */
+  function saveToken(token, expiresIn) {
+    const expiry = Date.now() + (expiresIn * 1000) - 60000; // 1min buffer
+    accessToken  = token;
+    tokenExpiry  = expiry;
+    localStorage.setItem(TOKEN_KEY,  token);
+    localStorage.setItem(EXPIRY_KEY, expiry.toString());
+  }
+
+  function loadToken() {
+    const token  = localStorage.getItem(TOKEN_KEY);
+    const expiry = parseInt(localStorage.getItem(EXPIRY_KEY) || '0', 10);
+    if (token && Date.now() < expiry) {
+      accessToken = token;
+      tokenExpiry = expiry;
+      return true;
     }
+    clearToken();
+    return false;
+  }
+
+  function clearToken() {
+    accessToken = null;
+    tokenExpiry = null;
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(EXPIRY_KEY);
+    folderId   = null;
+    dataFileId = null;
+  }
+
+  /* ── Authenticated fetch ──────────────────────────── */
+  async function gfetch(url, opts = {}) {
     const res = await fetch(url, {
       ...opts,
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        ...(opts.headers || {}),
-      },
+      headers: { 'Authorization': `Bearer ${accessToken}`, ...(opts.headers || {}) },
     });
     if (!res.ok) {
       const err = await res.text();
-      throw new Error(`Drive API error ${res.status}: ${err}`);
+      throw new Error(`Drive API ${res.status}: ${err}`);
     }
     const text = await res.text();
     try { return text ? JSON.parse(text) : {}; } catch(e) { return {}; }
   }
 
-  /* ── Session persistence ──────────────────────────── */
-  function saveSession(token, expiresIn) {
-    const expiry = Date.now() + (expiresIn * 1000);
-    tokenExpiry = expiry;
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ token, expiry }));
-  }
-
-  function loadSession() {
-    try {
-      const raw = localStorage.getItem(SESSION_KEY);
-      if (!raw) return null;
-      const { token, expiry } = JSON.parse(raw);
-      // Don't restore if expired
-      if (Date.now() > expiry) { localStorage.removeItem(SESSION_KEY); return null; }
-      return { token, expiry };
-    } catch(e) { return null; }
-  }
-
-  function clearSession() {
-    localStorage.removeItem(SESSION_KEY);
-    tokenExpiry = null;
-  }
-
-  /* ── Silent refresh using stored hint ────────────────
-     Google's token client supports prompt='' which skips
-     the consent screen if the user has previously granted
-     access. Combined with select_account hint, this gives
-     a seamless re-auth on page load.
-   ───────────────────────────────────────────────────── */
-  /* ── Silent refresh — only used on page load, with timeout ── */
-  async function silentRefresh() {
-    return new Promise((resolve, reject) => {
-      const storedHint = localStorage.getItem('labtrack_email') || '';
-      // Timeout after 3 seconds — if Google doesn't respond, fail fast
-      const timeout = setTimeout(() => reject(new Error('silent_timeout')), 3000);
-      const tc = google.accounts.oauth2.initTokenClient({
-        client_id: CONFIG.CLIENT_ID,
-        scope: CONFIG.SCOPES,
-        hint: storedHint,
-        callback: (resp) => {
-          clearTimeout(timeout);
-          if (resp.error) { reject(new Error(resp.error)); return; }
-          accessToken = resp.access_token;
-          saveSession(resp.access_token, resp.expires_in || 3600);
-          resolve(resp.access_token);
-        },
-      });
-      tc.requestAccessToken({ prompt: '' });
+  /* ── OAuth redirect flow ──────────────────────────── */
+  // Step 1: redirect to Google
+  function redirectToGoogle() {
+    const params = new URLSearchParams({
+      client_id:     CONFIG.CLIENT_ID,
+      redirect_uri:  window.location.origin + window.location.pathname,
+      response_type: 'token',
+      scope:         CONFIG.SCOPES,
+      include_granted_scopes: 'true',
     });
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
   }
 
-  /* ── Init — check for stored session ─────────────── */
-  async function init() {
-    // Wait for Google Identity Services to load (up to 5 seconds)
-    await new Promise((resolve, reject) => {
-      if (typeof google !== 'undefined' && google.accounts) { resolve(); return; }
-      let waited = 0;
-      const check = setInterval(() => {
-        waited += 100;
-        if (typeof google !== 'undefined' && google.accounts) { clearInterval(check); resolve(); return; }
-        if (waited > 5000) { clearInterval(check); reject(new Error('Google API failed to load')); }
-      }, 100);
-    });
+  // Step 2: called on page load to check if we're returning from Google
+  function handleRedirectCallback() {
+    // Google returns the token in the URL hash fragment
+    const hash = window.location.hash;
+    if (!hash) return false;
 
-    // Pre-initialise the token client so it's ready when the button is clicked
-    // This avoids the "nothing happens" bug caused by initialising inside a click handler
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: CONFIG.CLIENT_ID,
-      scope: CONFIG.SCOPES,
-      callback: (resp) => {
-        if (tokenClient._callback) tokenClient._callback(resp);
-      },
-    });
+    const params = new URLSearchParams(hash.substring(1)); // strip leading #
+    const token      = params.get('access_token');
+    const expiresIn  = parseInt(params.get('expires_in') || '3600', 10);
+    const error      = params.get('error');
 
-    // Check for a stored valid session
-    const session = loadSession();
-    if (session) {
-      accessToken = session.token;
-      tokenExpiry = session.expiry;
+    // Clean the hash from the URL so refreshing doesn't re-trigger
+    window.history.replaceState(null, '', window.location.pathname);
+
+    if (error) {
+      console.warn('OAuth error:', error);
+      return false;
+    }
+
+    if (token) {
+      saveToken(token, expiresIn);
       return true;
     }
+
     return false;
   }
 
-  /* ── Sign in — called directly from button click ──── */
-  async function signIn() {
-    // If we have a stored session, try silent refresh first (no popup)
-    if (loadSession()) {
-      try {
-        await silentRefresh();
-        return accessToken;
-      } catch(e) {
-        clearSession(); // Session stale — fall through to full sign-in
-      }
+  /* ── Init ─────────────────────────────────────────── */
+  async function init() {
+    // 1. Check if returning from Google OAuth redirect
+    const fromRedirect = handleRedirectCallback();
+    if (fromRedirect) return true; // has fresh token
+
+    // 2. Check for valid stored token
+    if (loadToken()) return true;
+
+    // 3. No token — need sign-in
+    return false;
+  }
+
+  /* ── Sign in — just redirects to Google ──────────── */
+  function signIn() {
+    redirectToGoogle();
+    // This never resolves — the page navigates away
+    return new Promise(() => {});
+  }
+
+  /* ── Sign out ─────────────────────────────────────── */
+  function signOut() {
+    // Revoke the token
+    if (accessToken) {
+      fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, { method: 'POST' })
+        .catch(() => {});
     }
-
-    // Full sign-in — must be called from a user gesture (button click)
-    return new Promise((resolve, reject) => {
-      if (!tokenClient) {
-        reject(new Error('Google API not ready. Please refresh the page.'));
-        return;
-      }
-
-      // Attach one-time callback
-      tokenClient._callback = (resp) => {
-        tokenClient._callback = null;
-        if (resp.error) {
-          if (resp.error === 'popup_closed_by_user' || resp.error === 'access_denied') {
-            reject(new Error('Sign-in cancelled'));
-          } else {
-            reject(new Error(resp.error));
-          }
-          return;
-        }
-        accessToken = resp.access_token;
-        saveSession(resp.access_token, resp.expires_in || 3600);
-        getUserEmail().then(email => {
-          if (email) localStorage.setItem('labtrack_email', email);
-        });
-        resolve(resp.access_token);
-      };
-
-      // Try popup first; if it fails (blocked by desktop browser),
-      // fall back to a redirect-based flow after a short delay
-      let popupOpened = false;
-      const fallbackTimer = setTimeout(() => {
-        if (!popupOpened) {
-          // Popup was likely blocked — use redirect flow
-          tokenClient._callback = null;
-          reject(new Error('popup_blocked'));
-        }
-      }, 2000);
-
-      try {
-        tokenClient.requestAccessToken({ prompt: 'select_account' });
-        // If we get here without throwing, popup opened
-        popupOpened = true;
-        clearTimeout(fallbackTimer);
-      } catch(e) {
-        clearTimeout(fallbackTimer);
-        reject(e);
-      }
-    }).catch(async (err) => {
-      if (err.message === 'popup_blocked') {
-        // Popup was blocked — use Google One Tap / redirect instead
-        return new Promise((resolve, reject) => {
-          tokenClient._callback = (resp) => {
-            tokenClient._callback = null;
-            if (resp.error) { reject(new Error(resp.error)); return; }
-            accessToken = resp.access_token;
-            saveSession(resp.access_token, resp.expires_in || 3600);
-            getUserEmail().then(email => {
-              if (email) localStorage.setItem('labtrack_email', email);
-            });
-            resolve(resp.access_token);
-          };
-          // Use consent prompt which is more likely to bypass popup blockers
-          tokenClient.requestAccessToken({ prompt: 'consent' });
-        });
-      }
-      throw err;
-    });
+    clearToken();
+    localStorage.removeItem(EMAIL_KEY);
   }
 
-  /* ── Get user email for hint ──────────────────────── */
-  async function getUserEmail() {
-    try {
-      const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { 'Authorization': `Bearer ${accessToken}` },
-      });
-      const json = await res.json();
-      return json.email || null;
-    } catch(e) { return null; }
-  }
+  function isSignedIn() { return !!accessToken && Date.now() < (tokenExpiry || 0); }
 
+  /* ── User info ────────────────────────────────────── */
   async function getUserInfo() {
     try {
       const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
         headers: { 'Authorization': `Bearer ${accessToken}` },
       });
-      return await res.json();
+      const info = await res.json();
+      if (info.email) localStorage.setItem(EMAIL_KEY, info.email);
+      return info;
     } catch(e) { return null; }
   }
-
-  function signOut() {
-    if (accessToken) google.accounts.oauth2.revoke(accessToken, () => {});
-    accessToken = null;
-    folderId = null;
-    dataFileId = null;
-    clearSession();
-    localStorage.removeItem('labtrack_email');
-  }
-
-  function isSignedIn() { return !!accessToken; }
 
   /* ── Folder management ────────────────────────────── */
   async function ensureFolder() {
     if (folderId) return folderId;
-
-    const q = encodeURIComponent(`name='${CONFIG.DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+    const q   = encodeURIComponent(`name='${CONFIG.DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
     const res = await gfetch(`${API}/files?q=${q}&fields=files(id,name,webViewLink)&spaces=drive`);
 
     if (res.files && res.files.length > 0) {
-      folderId = res.files[0].id;
+      folderId       = res.files[0].id;
       driveFolderUrl = res.files[0].webViewLink;
       return folderId;
     }
 
     const created = await gfetch(`${API}/files?fields=id,webViewLink`, {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: CONFIG.DRIVE_FOLDER_NAME,
-        mimeType: 'application/vnd.google-apps.folder',
-      }),
+      body:    JSON.stringify({ name: CONFIG.DRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' }),
     });
-
-    folderId = created.id;
+    folderId       = created.id;
     driveFolderUrl = created.webViewLink;
     return folderId;
   }
 
   function getFolderUrl() { return driveFolderUrl; }
-  function getFolderId() { return folderId; }
+  function getFolderId()  { return folderId; }
 
   /* ── Data file ────────────────────────────────────── */
   async function loadDataFile() {
     await ensureFolder();
-
-    const q = encodeURIComponent(`name='${CONFIG.DATA_FILE_NAME}' and '${folderId}' in parents and trashed=false`);
+    const q   = encodeURIComponent(`name='${CONFIG.DATA_FILE_NAME}' and '${folderId}' in parents and trashed=false`);
     const res = await gfetch(`${API}/files?q=${q}&fields=files(id)`);
 
-    if (!res.files || res.files.length === 0) {
-      dataFileId = null;
-      return null;
-    }
-
+    if (!res.files || res.files.length === 0) { dataFileId = null; return null; }
     dataFileId = res.files[0].id;
 
     const content = await fetch(`${API}/files/${dataFileId}?alt=media`, {
       headers: { 'Authorization': `Bearer ${accessToken}` },
     });
-
     const text = await content.text();
     try { return JSON.parse(text); } catch(e) { return null; }
   }
@@ -290,25 +193,18 @@ const Drive = (() => {
 
     if (dataFileId) {
       await fetch(`${UPLOAD}/files/${dataFileId}?uploadType=media`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
+        method:  'PATCH',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body,
       });
     } else {
-      const boundary = 'labtrack_boundary';
-      const meta = JSON.stringify({ name: CONFIG.DATA_FILE_NAME, parents: [folderId] });
-      const multipart = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
-
-      const res = await fetch(`${UPLOAD}/files?uploadType=multipart&fields=id`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': `multipart/related; boundary=${boundary}`,
-        },
-        body: multipart,
+      const boundary = 'labtrack_b';
+      const meta     = JSON.stringify({ name: CONFIG.DATA_FILE_NAME, parents: [folderId] });
+      const mp       = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
+      const res      = await fetch(`${UPLOAD}/files?uploadType=multipart&fields=id`, {
+        method:  'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+        body:    mp,
       });
       const json = await res.json();
       dataFileId = json.id;
@@ -324,34 +220,25 @@ const Drive = (() => {
   /* ── CSV upload ───────────────────────────────────── */
   async function uploadCSV(filename, content) {
     await ensureFolder();
-
-    const q = encodeURIComponent(`name='${filename}' and '${folderId}' in parents and trashed=false`);
+    const boundary = 'labtrack_b';
+    const q        = encodeURIComponent(`name='${filename}' and '${folderId}' in parents and trashed=false`);
     const existing = await gfetch(`${API}/files?q=${q}&fields=files(id)`);
-    const boundary = 'labtrack_boundary';
 
     if (existing.files && existing.files.length > 0) {
-      const existingId = existing.files[0].id;
-      await fetch(`${UPLOAD}/files/${existingId}?uploadType=media`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'text/csv',
-        },
-        body: content,
+      await fetch(`${UPLOAD}/files/${existing.files[0].id}?uploadType=media`, {
+        method:  'PATCH',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'text/csv' },
+        body:    content,
       });
-      return existingId;
+      return existing.files[0].id;
     }
 
     const meta = JSON.stringify({ name: filename, parents: [folderId] });
-    const multipart = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: text/csv\r\n\r\n${content}\r\n--${boundary}--`;
-
-    const res = await fetch(`${UPLOAD}/files?uploadType=multipart&fields=id`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': `multipart/related; boundary=${boundary}`,
-      },
-      body: multipart,
+    const mp   = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: text/csv\r\n\r\n${content}\r\n--${boundary}--`;
+    const res  = await fetch(`${UPLOAD}/files?uploadType=multipart&fields=id`, {
+      method:  'POST',
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body:    mp,
     });
     const json = await res.json();
     return json.id;
@@ -359,7 +246,7 @@ const Drive = (() => {
 
   async function listCSVFiles() {
     await ensureFolder();
-    const q = encodeURIComponent(`'${folderId}' in parents and name contains '.csv' and trashed=false`);
+    const q   = encodeURIComponent(`'${folderId}' in parents and name contains '.csv' and trashed=false`);
     const res = await gfetch(`${API}/files?q=${q}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`);
     return res.files || [];
   }
