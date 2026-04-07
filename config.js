@@ -5,10 +5,10 @@
 
 const CONFIG = {
   // From Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client ID
-  CLIENT_ID: '475390764115-v3588flr9668gt9s0pqmoq31gjc2oepv.apps.googleusercontent.com',
+  CLIENT_ID: 'YOUR_CLIENT_ID.apps.googleusercontent.com',
 
   // The Drive API key (used for non-auth requests)
-  API_KEY: 'AIzaSyBlXuOdOjyXYXkGMzIvet4OAsuqxexe8Sw',
+  API_KEY: 'YOUR_API_KEY',
 
   // OAuth scopes — drive.file means the app can ONLY see files it creates
   SCOPES: 'https://www.googleapis.com/auth/drive.file',

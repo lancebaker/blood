@@ -1,0 +1,90 @@
+date,test_name,value,unit
+2025-04-02,Total Cholesterol,263,mg/dL
+2025-04-02,Triglycerides,135,mg/dL
+2025-04-02,HDL Cholesterol,46,mg/dL
+2025-04-02,LDL Cholesterol,192,mg/dL
+2025-04-02,Glucose,83,mg/dL
+2025-04-02,Sodium,137,mmol/L
+2025-04-02,Potassium,4.1,mmol/L
+2025-04-02,Chloride,103,mmol/L
+2025-04-02,Carbon Dioxide,29,mmol/L
+2025-04-02,Anion Gap,5,mmol/L
+2025-04-02,Blood Urea Nitrogen,10,mg/dL
+2025-04-02,Creatinine,1.13,mg/dL
+2025-04-02,Calcium,9.0,mg/dL
+2025-04-02,eGFR,84,mL/min
+2025-04-02,ALT,15,U/L
+2025-04-02,AST,23,U/L
+2025-04-02,Albumin,4.6,g/dL
+2025-04-02,Bilirubin total,0.7,mg/dL
+2025-04-02,Alkaline Phosphatase,36,U/L
+2025-04-02,WBC,5.9,K/uL
+2025-04-02,RBC,4.96,M/uL
+2025-04-02,Hemoglobin,15.6,g/dL
+2025-04-02,Hematocrit,44.6,%
+2025-04-02,Platelets,198,K/uL
+2025-04-02,TSH,2.28,mIU/L
+2025-04-02,Free T4,0.86,ng/dL
+2025-04-02,Vitamin D,29,ng/mL
+2025-04-02,Vitamin B12,694,pg/mL
+2025-04-02,Folate,20.0,ng/mL
+2025-04-02,Magnesium,2.2,mg/dL
+2025-04-02,HbA1c,5.1,%
+2025-04-02,Vitamin B6,57,ug/L
+2025-04-02,PSA,0.9,ng/mL
+2025-04-02,Testosterone,274,ng/dL
+2025-04-02,Sex Hormone Binding Globulin,40.9,nmol/L
+2025-04-02,Calc Free Testosterone,4.7,ng/dL
+2025-04-02,Calc Bioav Testosterone,109.5,ng/dL
+2025-08-26,Total Cholesterol,256,mg/dL
+2025-08-26,Triglycerides,288,mg/dL
+2025-08-26,HDL Cholesterol,43,mg/dL
+2025-08-26,LDL Cholesterol,190,mg/dL
+2025-08-26,Glucose,82,mg/dL
+2025-08-26,Sodium,139,mmol/L
+2025-08-26,Potassium,4.2,mmol/L
+2025-08-26,Chloride,106,mmol/L
+2025-08-26,Carbon Dioxide,30,mmol/L
+2025-08-26,Anion Gap,3,mmol/L
+2025-08-26,Blood Urea Nitrogen,16,mg/dL
+2025-08-26,Creatinine,1.04,mg/dL
+2025-08-26,Calcium,9.6,mg/dL
+2025-08-26,eGFR,93,mL/min
+2025-08-26,ALT,18,U/L
+2025-08-26,AST,28,U/L
+2025-08-26,Albumin,4.6,g/dL
+2025-08-26,Bilirubin total,0.4,mg/dL
+2025-08-26,Alkaline Phosphatase,42,U/L
+2025-08-26,WBC,6.3,K/uL
+2025-08-26,RBC,5.01,M/uL
+2025-08-26,Hemoglobin,15.4,g/dL
+2025-08-26,Hematocrit,45.1,%
+2025-08-26,Platelets,228,K/uL
+2025-08-26,PSA,0.9,ng/mL
+2025-08-26,Vitamin D,29,ng/mL
+2025-08-26,Testosterone,234,ng/dL
+2025-08-26,Sex Hormone Binding Globulin,34.0,nmol/L
+2025-08-26,Calc Free Testosterone,4.4,ng/dL
+2025-08-26,Calc Bioav Testosterone,103.6,ng/dL
+2025-08-26,Estradiol,20,pg/mL
+2025-11-24,Total Cholesterol,261,mg/dL
+2025-11-24,Triglycerides,184,mg/dL
+2025-11-24,HDL Cholesterol,38,mg/dL
+2025-11-24,LDL Cholesterol,188,mg/dL
+2025-11-24,Glucose,83,mg/dL
+2025-11-24,Sodium,139,mmol/L
+2025-11-24,Potassium,4.3,mmol/L
+2025-11-24,Chloride,106,mmol/L
+2025-11-24,Carbon Dioxide,27,mmol/L
+2025-11-24,Anion Gap,6,mmol/L
+2025-11-24,Blood Urea Nitrogen,8,mg/dL
+2025-11-24,Creatinine,1.06,mg/dL
+2025-11-24,Calcium,9.2,mg/dL
+2025-11-24,eGFR,91,mL/min
+2025-11-24,Bilirubin Direct,0.1,mg/dL
+2025-11-24,PSA,1.2,ng/mL
+2025-11-24,Testosterone,1097,ng/dL
+2025-11-24,Sex Hormone Binding Globulin,23.3,nmol/L
+2025-11-24,Calc Free Testosterone,31.8,ng/dL
+2025-11-24,Calc Bioav Testosterone,744.7,ng/dL
+2025-11-24,Estradiol,54,pg/mL
