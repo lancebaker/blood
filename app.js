@@ -181,8 +181,8 @@ const RANGES = {
   'Cortisol': {
     min: 6, max: 23, unit: 'µg/dL', cat: 'Hormones',
     what: 'The primary stress hormone, produced by the adrenal glands. Cortisol regulates metabolism, immune response, blood pressure, and the sleep-wake cycle. Best measured in the morning when levels are highest.',
-    high: 'Chronically elevated cortisol (Cushing's syndrome) causes weight gain (especially in the abdomen and face), high blood pressure, diabetes, muscle weakness, and poor wound healing. Also elevated during acute stress or illness.',
-    low: 'Low cortisol may indicate adrenal insufficiency (Addison's disease). Symptoms include fatigue, weight loss, low blood pressure, salt cravings, and nausea.',
+    high: 'Chronically elevated cortisol (Cushing\'s syndrome) causes weight gain (especially in the abdomen and face), high blood pressure, diabetes, muscle weakness, and poor wound healing. Also elevated during acute stress or illness.',
+    low: 'Low cortisol may indicate adrenal insufficiency (Addison\'s disease). Symptoms include fatigue, weight loss, low blood pressure, salt cravings, and nausea.',
   },
   'DHEA-S': {
     min: 80, max: 560, unit: 'µg/dL', cat: 'Hormones',
