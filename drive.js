@@ -1,29 +1,31 @@
 /* ── drive.js — Google Drive API layer ───────────────
-   Uses redirect-based OAuth (no popups) so it works
-   on all browsers and devices without permission issues.
-   Data stored in user's own Google Drive.
+   Uses Google Identity Services (GIS) token model.
+   Popups must be allowed for lancebaker.github.io
    ───────────────────────────────────────────────────── */
 
 const Drive = (() => {
   let accessToken = null;
-  let tokenExpiry = null;
-  let folderId = null;
-  let dataFileId = null;
+  let tokenExpiry  = null;
+  let folderId    = null;
+  let dataFileId  = null;
   let driveFolderUrl = null;
+  let tokenClientReady = false;
+  let resolveSignIn = null;
+  let rejectSignIn  = null;
 
   const API    = 'https://www.googleapis.com/drive/v3';
   const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
-  const TOKEN_KEY   = 'labtrack_token';
-  const EXPIRY_KEY  = 'labtrack_expiry';
-  const EMAIL_KEY   = 'labtrack_email';
+  const TOKEN_KEY  = 'labtrack_token';
+  const EXPIRY_KEY = 'labtrack_expiry';
+  const EMAIL_KEY  = 'labtrack_email';
 
   /* ── Token storage ────────────────────────────────── */
   function saveToken(token, expiresIn) {
-    const expiry = Date.now() + (expiresIn * 1000) - 60000; // 1min buffer
-    accessToken  = token;
-    tokenExpiry  = expiry;
+    const expiry = Date.now() + ((expiresIn - 60) * 1000);
+    accessToken = token;
+    tokenExpiry = expiry;
     localStorage.setItem(TOKEN_KEY,  token);
-    localStorage.setItem(EXPIRY_KEY, expiry.toString());
+    localStorage.setItem(EXPIRY_KEY, String(expiry));
   }
 
   function loadToken() {
@@ -61,72 +63,86 @@ const Drive = (() => {
     try { return text ? JSON.parse(text) : {}; } catch(e) { return {}; }
   }
 
-  /* ── OAuth redirect flow ──────────────────────────── */
-  // Step 1: redirect to Google
-  function redirectToGoogle() {
-    const params = new URLSearchParams({
-      client_id:     CONFIG.CLIENT_ID,
-      redirect_uri:  window.location.origin + window.location.pathname,
-      response_type: 'token',
-      scope:         CONFIG.SCOPES,
-      include_granted_scopes: 'true',
-    });
-    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-  }
-
-  // Step 2: called on page load to check if we're returning from Google
-  function handleRedirectCallback() {
-    // Google returns the token in the URL hash fragment
-    const hash = window.location.hash;
-    if (!hash) return false;
-
-    const params = new URLSearchParams(hash.substring(1)); // strip leading #
-    const token      = params.get('access_token');
-    const expiresIn  = parseInt(params.get('expires_in') || '3600', 10);
-    const error      = params.get('error');
-
-    // Clean the hash from the URL so refreshing doesn't re-trigger
-    window.history.replaceState(null, '', window.location.pathname);
-
-    if (error) {
-      console.warn('OAuth error:', error);
-      return false;
-    }
-
-    if (token) {
-      saveToken(token, expiresIn);
-      return true;
-    }
-
-    return false;
-  }
-
   /* ── Init ─────────────────────────────────────────── */
   async function init() {
-    // 1. Check if returning from Google OAuth redirect
-    const fromRedirect = handleRedirectCallback();
-    if (fromRedirect) return true; // has fresh token
+    // Wait for GIS to load
+    await new Promise((resolve) => {
+      if (typeof google !== 'undefined' && google.accounts) { resolve(); return; }
+      const iv = setInterval(() => {
+        if (typeof google !== 'undefined' && google.accounts) { clearInterval(iv); resolve(); }
+      }, 50);
+      setTimeout(() => { clearInterval(iv); resolve(); }, 5000);
+    });
 
-    // 2. Check for valid stored token
-    if (loadToken()) return true;
+    // Pre-init token client so popup opens instantly on button click
+    if (typeof google !== 'undefined' && google.accounts) {
+      google.accounts.oauth2.initTokenClient({
+        client_id: CONFIG.CLIENT_ID,
+        scope: CONFIG.SCOPES,
+        callback: (resp) => {
+          if (resp.error) {
+            if (rejectSignIn) rejectSignIn(new Error(resp.error));
+          } else {
+            saveToken(resp.access_token, resp.expires_in || 3600);
+            getUserEmail().then(email => {
+              if (email) localStorage.setItem(EMAIL_KEY, email);
+            });
+            if (resolveSignIn) resolveSignIn(resp.access_token);
+          }
+          resolveSignIn = null;
+          rejectSignIn  = null;
+        },
+        error_callback: (err) => {
+          if (rejectSignIn) rejectSignIn(new Error(err.type || 'sign_in_failed'));
+          resolveSignIn = null;
+          rejectSignIn  = null;
+        },
+      });
+      tokenClientReady = true;
+    }
 
-    // 3. No token — need sign-in
-    return false;
+    return loadToken();
   }
 
-  /* ── Sign in — just redirects to Google ──────────── */
+  /* ── Sign in ──────────────────────────────────────── */
   function signIn() {
-    redirectToGoogle();
-    // This never resolves — the page navigates away
-    return new Promise(() => {});
+    if (!tokenClientReady) {
+      return Promise.reject(new Error('Google API not ready. Please refresh.'));
+    }
+    return new Promise((resolve, reject) => {
+      resolveSignIn = resolve;
+      rejectSignIn  = reject;
+      // Re-init each time to ensure fresh callback
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: CONFIG.CLIENT_ID,
+        scope: CONFIG.SCOPES,
+        callback: (resp) => {
+          if (resp.error) {
+            if (resp.error === 'popup_closed_by_user' || resp.error === 'access_denied') {
+              reject(new Error('cancelled'));
+            } else {
+              reject(new Error(resp.error));
+            }
+          } else {
+            saveToken(resp.access_token, resp.expires_in || 3600);
+            getUserEmail().then(email => {
+              if (email) localStorage.setItem(EMAIL_KEY, email);
+            });
+            resolve(resp.access_token);
+          }
+        },
+        error_callback: (err) => {
+          reject(new Error(err.type || 'sign_in_failed'));
+        },
+      });
+      client.requestAccessToken({ prompt: 'select_account' });
+    });
   }
 
   /* ── Sign out ─────────────────────────────────────── */
   function signOut() {
-    // Revoke the token
     if (accessToken) {
-      fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, { method: 'POST' })
-        .catch(() => {});
+      google.accounts.oauth2.revoke(accessToken, () => {});
     }
     clearToken();
     localStorage.removeItem(EMAIL_KEY);
@@ -135,35 +151,41 @@ const Drive = (() => {
   function isSignedIn() { return !!accessToken && Date.now() < (tokenExpiry || 0); }
 
   /* ── User info ────────────────────────────────────── */
-  async function getUserInfo() {
+  async function getUserEmail() {
     try {
       const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
         headers: { 'Authorization': `Bearer ${accessToken}` },
       });
       const info = await res.json();
-      if (info.email) localStorage.setItem(EMAIL_KEY, info.email);
-      return info;
+      return info.email || null;
     } catch(e) { return null; }
   }
 
-  /* ── Folder management ────────────────────────────── */
+  async function getUserInfo() {
+    try {
+      const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      return await res.json();
+    } catch(e) { return null; }
+  }
+
+  /* ── Folder ───────────────────────────────────────── */
   async function ensureFolder() {
     if (folderId) return folderId;
     const q   = encodeURIComponent(`name='${CONFIG.DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
     const res = await gfetch(`${API}/files?q=${q}&fields=files(id,name,webViewLink)&spaces=drive`);
-
     if (res.files && res.files.length > 0) {
-      folderId       = res.files[0].id;
+      folderId = res.files[0].id;
       driveFolderUrl = res.files[0].webViewLink;
       return folderId;
     }
-
     const created = await gfetch(`${API}/files?fields=id,webViewLink`, {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ name: CONFIG.DRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' }),
+      body: JSON.stringify({ name: CONFIG.DRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' }),
     });
-    folderId       = created.id;
+    folderId = created.id;
     driveFolderUrl = created.webViewLink;
     return folderId;
   }
@@ -176,35 +198,31 @@ const Drive = (() => {
     await ensureFolder();
     const q   = encodeURIComponent(`name='${CONFIG.DATA_FILE_NAME}' and '${folderId}' in parents and trashed=false`);
     const res = await gfetch(`${API}/files?q=${q}&fields=files(id)`);
-
     if (!res.files || res.files.length === 0) { dataFileId = null; return null; }
     dataFileId = res.files[0].id;
-
     const content = await fetch(`${API}/files/${dataFileId}?alt=media`, {
       headers: { 'Authorization': `Bearer ${accessToken}` },
     });
-    const text = await content.text();
-    try { return JSON.parse(text); } catch(e) { return null; }
+    try { return await content.json(); } catch(e) { return null; }
   }
 
   async function saveDataFile(data) {
     await ensureFolder();
     const body = JSON.stringify(data, null, 2);
-
     if (dataFileId) {
       await fetch(`${UPLOAD}/files/${dataFileId}?uploadType=media`, {
-        method:  'PATCH',
+        method: 'PATCH',
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
         body,
       });
     } else {
-      const boundary = 'labtrack_b';
-      const meta     = JSON.stringify({ name: CONFIG.DATA_FILE_NAME, parents: [folderId] });
-      const mp       = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
-      const res      = await fetch(`${UPLOAD}/files?uploadType=multipart&fields=id`, {
-        method:  'POST',
-        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
-        body:    mp,
+      const b   = 'lt_b';
+      const meta = JSON.stringify({ name: CONFIG.DATA_FILE_NAME, parents: [folderId] });
+      const mp  = `--${b}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${b}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${b}--`;
+      const res  = await fetch(`${UPLOAD}/files?uploadType=multipart&fields=id`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${b}` },
+        body: mp,
       });
       const json = await res.json();
       dataFileId = json.id;
@@ -220,25 +238,23 @@ const Drive = (() => {
   /* ── CSV upload ───────────────────────────────────── */
   async function uploadCSV(filename, content) {
     await ensureFolder();
-    const boundary = 'labtrack_b';
-    const q        = encodeURIComponent(`name='${filename}' and '${folderId}' in parents and trashed=false`);
+    const q = encodeURIComponent(`name='${filename}' and '${folderId}' in parents and trashed=false`);
     const existing = await gfetch(`${API}/files?q=${q}&fields=files(id)`);
-
+    const b = 'lt_b';
     if (existing.files && existing.files.length > 0) {
       await fetch(`${UPLOAD}/files/${existing.files[0].id}?uploadType=media`, {
-        method:  'PATCH',
+        method: 'PATCH',
         headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'text/csv' },
-        body:    content,
+        body: content,
       });
       return existing.files[0].id;
     }
-
     const meta = JSON.stringify({ name: filename, parents: [folderId] });
-    const mp   = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: text/csv\r\n\r\n${content}\r\n--${boundary}--`;
+    const mp   = `--${b}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${b}\r\nContent-Type: text/csv\r\n\r\n${content}\r\n--${b}--`;
     const res  = await fetch(`${UPLOAD}/files?uploadType=multipart&fields=id`, {
-      method:  'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
-      body:    mp,
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${b}` },
+      body: mp,
     });
     const json = await res.json();
     return json.id;

@@ -284,10 +284,21 @@ function showAuth(panel, msg = '') {
 }
 
 async function signIn() {
-  // Redirect flow — this navigates away from the page.
-  // The user is sent to Google, approves, and comes back.
-  showAuth('loading', 'Redirecting to Google…');
-  Drive.signIn(); // triggers redirect, page navigates away
+  showAuth('loading', 'Opening Google sign-in…');
+  try {
+    await Drive.signIn();
+    showAuth('loading', 'Loading your lab data…');
+    await afterSignIn();
+  } catch(e) {
+    if (e.message === 'cancelled') { showAuth('signIn'); return; }
+    if (e.message && e.message.includes('not ready')) {
+      showAuth('error', 'Still loading — please wait a moment and try again.');
+      return;
+    }
+    // Likely popup blocked
+    showAuth('error',
+      'Sign-in popup was blocked. In Chrome: click the popup icon in the address bar and select "Always allow pop-ups from lancebaker.github.io", then try again.');
+  }
 }
 
 async function afterSignIn() {
