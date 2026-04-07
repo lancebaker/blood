@@ -244,6 +244,103 @@ const RANGES = {
     high: 'Zinc toxicity from supplements can cause nausea, vomiting, and impaired copper absorption. Rare from food alone.',
     low: 'Deficiency causes impaired immune function, poor wound healing, loss of taste and smell, hair loss, skin problems, and growth retardation in children. Common in vegetarians and those with malabsorption disorders.',
   },
+  'Calc Free Testosterone': {
+    min: 3.2, max: 19.0, unit: 'ng/dL', cat: 'Hormones',
+    what: 'Calculated free testosterone estimates the fraction of testosterone not bound to proteins, making it biologically active. Calculated using the Vermeulen formula from total testosterone, SHBG, and albumin.',
+    high: 'Elevated free testosterone in men may indicate exogenous testosterone use. In women, elevated levels are associated with PCOS or adrenal tumors.',
+    low: 'Low free testosterone causes fatigue, low libido, erectile dysfunction, reduced muscle mass, and depression — even when total testosterone appears borderline normal.',
+  },
+  'Calc Bioav Testosterone': {
+    min: 80.7, max: 446.7, unit: 'ng/dL', cat: 'Hormones',
+    what: 'Bioavailable testosterone includes free testosterone and testosterone loosely bound to albumin — the total fraction actually accessible to tissues. Calculated from total testosterone, SHBG, and albumin using the Vermeulen formula.',
+    high: 'Elevated bioavailable testosterone may indicate exogenous hormone use. In women, high levels suggest androgen excess conditions such as PCOS or adrenal overactivity.',
+    low: 'Low bioavailable testosterone is often more clinically meaningful than low total testosterone. Symptoms include fatigue, low libido, reduced strength, poor mood, and cognitive fog.',
+  },
+  'Calc Bioav. Testosterone': {
+    min: 80.7, max: 446.7, unit: 'ng/dL', cat: 'Hormones',
+    what: 'Bioavailable testosterone includes free testosterone and testosterone loosely bound to albumin — the total fraction actually accessible to tissues. Calculated from total testosterone, SHBG, and albumin using the Vermeulen formula.',
+    high: 'Elevated bioavailable testosterone may indicate exogenous hormone use. In women, high levels suggest androgen excess conditions such as PCOS or adrenal overactivity.',
+    low: 'Low bioavailable testosterone is often more clinically meaningful than low total testosterone. Symptoms include fatigue, low libido, reduced strength, poor mood, and cognitive fog.',
+  },
+  'Sex Hormone Binding Globulin': {
+    min: 13.3, max: 89.5, unit: 'nmol/L', cat: 'Hormones',
+    what: 'Sex hormone-binding globulin is a protein produced by the liver that binds tightly to testosterone and estradiol, making them inactive. High SHBG reduces the amount of free, biologically active hormone available to tissues.',
+    high: 'Elevated SHBG reduces bioavailable testosterone and estrogen. Common causes include aging, hyperthyroidism, liver disease, and high estrogen states.',
+    low: 'Low SHBG increases free hormone levels. Associated with obesity, insulin resistance, hypothyroidism, and metabolic syndrome.',
+  },
+  'Free Androgen Index': {
+    min: 24.3, max: 110.2, unit: '%', cat: 'Hormones',
+    what: 'The Free Androgen Index is a ratio of total testosterone to SHBG, used as a surrogate marker for free testosterone. Calculated as (Total Testosterone / SHBG) x 100.',
+    high: 'High FAI suggests excess androgen activity. In women associated with PCOS, hirsutism, and acne. In men, may indicate exogenous androgen use.',
+    low: 'Low FAI indicates reduced androgen bioavailability, often due to high SHBG. Associated with hypogonadal symptoms even when total testosterone appears normal.',
+  },
+  'Bilirubin total': {
+    min: 0.2, max: 1.2, unit: 'mg/dL', cat: 'Liver',
+    what: 'Total bilirubin measures the overall level of bilirubin in the blood — the yellow pigment produced when red blood cells break down. The liver processes and excretes it in bile.',
+    high: 'Elevated total bilirubin causes jaundice (yellowing of skin and eyes). Causes include liver disease, bile duct obstruction, hemolytic anemia, and Gilbert syndrome.',
+    low: 'Low bilirubin has no clinical significance.',
+  },
+  'Bilirubin Direct': {
+    min: 0.0, max: 0.3, unit: 'mg/dL', cat: 'Liver',
+    what: 'Direct (conjugated) bilirubin is the water-soluble form processed by the liver and ready for excretion in bile. Elevated direct bilirubin specifically points to liver or bile duct problems.',
+    high: 'Elevated direct bilirubin indicates the liver cannot excrete bilirubin properly. Causes include bile duct obstruction, cholestatic liver disease, and hepatitis.',
+    low: 'Low or undetectable direct bilirubin is normal and not clinically significant.',
+  },
+  'Alkaline Phosphatase': {
+    min: 40, max: 140, unit: 'IU/L', cat: 'Liver',
+    what: 'Alkaline phosphatase (ALP) is an enzyme found in the liver, bile ducts, and bone. It is a sensitive marker for bile duct obstruction and bone disorders.',
+    high: 'Elevated ALP most commonly indicates bile duct obstruction or bone disease. Liver causes include gallstones and infiltrative liver disease.',
+    low: 'Low ALP may be seen with hypothyroidism, zinc deficiency, or hypophosphatasia — a rare genetic condition affecting bone mineralization.',
+  },
+  'Carbon Dioxide': {
+    min: 21, max: 35, unit: 'mmol/L', cat: 'Minerals',
+    what: 'Serum carbon dioxide (bicarbonate) reflects the acid-base balance of the blood. It is the main blood buffer, regulated by both the kidneys and lungs. Part of the basic and comprehensive metabolic panel.',
+    high: 'High bicarbonate indicates metabolic alkalosis — can result from vomiting, diuretic use, or adrenal conditions. May also reflect compensation for chronic respiratory acidosis.',
+    low: 'Low bicarbonate indicates metabolic acidosis — occurs with kidney disease, diabetic ketoacidosis, severe diarrhea, or lactic acidosis.',
+  },
+  'Chloride': {
+    min: 98, max: 111, unit: 'mmol/L', cat: 'Minerals',
+    what: 'Chloride is the main negatively charged electrolyte in blood and body fluids. It works alongside sodium to maintain fluid balance, blood pressure, and acid-base balance.',
+    high: 'Hyperchloremia can indicate dehydration, kidney disease, or metabolic acidosis. Often rises when bicarbonate falls.',
+    low: 'Hypochloremia is associated with prolonged vomiting, metabolic alkalosis, heart failure, or excessive sweating.',
+  },
+  'Anion Gap': {
+    min: 3, max: 13, unit: 'mmol/L', cat: 'Minerals',
+    what: 'The anion gap is a calculated value (Sodium minus Chloride minus Bicarbonate) reflecting unmeasured negative ions in blood. Used to identify the cause of metabolic acidosis.',
+    high: 'An elevated anion gap indicates abnormal acids in the blood. Classic causes include diabetic ketoacidosis, lactic acidosis, kidney failure, and certain toxic ingestions.',
+    low: 'A low anion gap is uncommon and may indicate low albumin levels, multiple myeloma, or laboratory error.',
+  },
+  'Vitamin B6': {
+    min: 5, max: 50, unit: 'ug/L', cat: 'Vitamins',
+    what: 'Vitamin B6 (pyridoxine) is essential for protein metabolism, neurotransmitter synthesis, immune function, and red blood cell production. Found in poultry, fish, potatoes, and bananas.',
+    high: 'Excess B6 from supplements can cause sensory neuropathy — numbness and tingling in hands and feet. Dietary excess alone is rarely harmful.',
+    low: 'Deficiency causes peripheral neuropathy, dermatitis, depression, and weakened immunity. More common with malabsorption, alcoholism, or medications like isoniazid.',
+  },
+  'MCV': {
+    min: 80, max: 100, unit: 'fL', cat: 'Blood',
+    what: 'Mean Corpuscular Volume measures the average size of red blood cells. Used to classify anemia into small (microcytic), normal (normocytic), or large (macrocytic) subtypes pointing to different causes.',
+    high: 'High MCV (macrocytosis) indicates large red blood cells — most commonly caused by vitamin B12 or folate deficiency, alcohol use, hypothyroidism, or liver disease.',
+    low: 'Low MCV (microcytosis) indicates small red blood cells — most commonly caused by iron deficiency anemia or thalassemia.',
+  },
+  'MCH': {
+    min: 26, max: 34, unit: 'pg', cat: 'Blood',
+    what: 'Mean Corpuscular Hemoglobin measures the average amount of hemoglobin per red blood cell. Large cells carry more hemoglobin, small cells carry less. Used alongside MCV to classify anemia.',
+    high: 'Elevated MCH is seen in macrocytic anemias from B12 or folate deficiency. Not clinically significant on its own.',
+    low: 'Low MCH indicates pale, hemoglobin-poor red blood cells. Caused by iron deficiency, thalassemia, or other microcytic anemias.',
+  },
+  'MCHC': {
+    min: 31, max: 37, unit: 'g/dL', cat: 'Blood',
+    what: 'Mean Corpuscular Hemoglobin Concentration measures the average concentration of hemoglobin inside red blood cells. The most direct measure of whether cells are adequately filled with hemoglobin.',
+    high: 'Elevated MCHC is rare and most classically associated with hereditary spherocytosis — where red blood cells are abnormally small and spherical.',
+    low: 'Low MCHC indicates hypochromic (pale) red blood cells, typically caused by iron deficiency anemia or thalassemia.',
+  },
+  'RDW': {
+    min: 0, max: 14.5, unit: '%', cat: 'Blood',
+    what: 'Red Cell Distribution Width measures the variation in size among red blood cells. High RDW means cells are unequal in size (anisocytosis), helping distinguish different types of anemia.',
+    high: 'Elevated RDW indicates mixed cell sizes — seen in iron deficiency, B12/folate deficiency, mixed nutritional deficiencies, and myelodysplastic syndrome.',
+    low: 'Low RDW indicates very uniform cell sizes, generally not clinically significant. May be seen in thalassemia trait.',
+  },
+
 };
 
 
@@ -1002,106 +1099,4 @@ function toast(msg, type = '') {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
 }
-  'Calc Free Testosterone (pg/mL)': {
-    min: 3.2, max: 19.0, unit: 'ng/dL', cat: 'Hormones',
-    what: 'Calculated free testosterone estimates the fraction of testosterone not bound to proteins, making it biologically active and available to tissues. Calculated using the Vermeulen formula from total testosterone, SHBG, and albumin.',
-    high: 'Elevated free testosterone in men may indicate exogenous testosterone use or certain adrenal conditions. In women, elevated levels are associated with PCOS, adrenal tumors, or anabolic steroid use.',
-    low: 'Low free testosterone causes the same symptoms as low total testosterone — fatigue, low libido, erectile dysfunction, reduced muscle mass, and depression — even when total testosterone appears borderline normal.',
-  },
-  'Calc Free Testosterone': {
-    min: 3.2, max: 19.0, unit: 'ng/dL', cat: 'Hormones',
-    what: 'Calculated free testosterone estimates the fraction of testosterone not bound to proteins, making it biologically active and available to tissues. Calculated using the Vermeulen formula from total testosterone, SHBG, and albumin.',
-    high: 'Elevated free testosterone in men may indicate exogenous testosterone use or certain adrenal conditions. In women, elevated levels are associated with PCOS, adrenal tumors, or anabolic steroid use.',
-    low: 'Low free testosterone causes the same symptoms as low total testosterone — fatigue, low libido, erectile dysfunction, reduced muscle mass, and depression — even when total testosterone appears borderline normal.',
-  },
-  'Calc Bioav. Testosterone': {
-    min: 80.7, max: 446.7, unit: 'ng/dL', cat: 'Hormones',
-    what: 'Bioavailable testosterone includes both free testosterone and testosterone loosely bound to albumin. It represents the total amount of testosterone actually accessible to tissues. Calculated from total testosterone, SHBG, and albumin using the Vermeulen formula.',
-    high: 'Elevated bioavailable testosterone may indicate exogenous hormone use. In women, high levels suggest androgen excess conditions such as PCOS or adrenal overactivity.',
-    low: 'Low bioavailable testosterone is often more clinically meaningful than low total testosterone alone. Symptoms include fatigue, low libido, reduced strength and muscle mass, poor mood, and cognitive fog.',
-  },
-  'Calc Bioav Testosterone': {
-    min: 80.7, max: 446.7, unit: 'ng/dL', cat: 'Hormones',
-    what: 'Bioavailable testosterone includes both free testosterone and testosterone loosely bound to albumin. It represents the total amount of testosterone actually accessible to tissues. Calculated from total testosterone, SHBG, and albumin using the Vermeulen formula.',
-    high: 'Elevated bioavailable testosterone may indicate exogenous hormone use. In women, high levels suggest androgen excess conditions such as PCOS or adrenal overactivity.',
-    low: 'Low bioavailable testosterone is often more clinically meaningful than low total testosterone alone. Symptoms include fatigue, low libido, reduced strength and muscle mass, poor mood, and cognitive fog.',
-  },
-  'Sex Hormone Binding Globulin': {
-    min: 13.3, max: 89.5, unit: 'nmol/L', cat: 'Hormones',
-    what: 'Sex hormone-binding globulin is a protein produced by the liver that binds tightly to testosterone and estradiol, making them inactive. High SHBG reduces the amount of free, biologically active hormone available to tissues.',
-    high: 'Elevated SHBG reduces bioavailable testosterone and estrogen. Common causes include aging, hyperthyroidism, liver disease, and high estrogen states. Even with normal total testosterone, high SHBG can cause hypogonadal symptoms.',
-    low: 'Low SHBG increases free hormone levels. Associated with obesity, insulin resistance, hypothyroidism, and metabolic syndrome. Low SHBG with normal total testosterone may indicate excess androgen activity.',
-  },
-  'Free Androgen Index': {
-    min: 24.3, max: 110.2, unit: '%', cat: 'Hormones',
-    what: 'The Free Androgen Index is a ratio of total testosterone to SHBG, used as a surrogate marker for free testosterone. Calculated as (Total Testosterone / SHBG) × 100. Higher values indicate more bioavailable androgen activity.',
-    high: 'High FAI suggests excess androgen activity. In women this is associated with PCOS, hirsutism, and acne. In men, may indicate exogenous androgen use or low SHBG from metabolic syndrome.',
-    low: 'Low FAI indicates reduced androgen bioavailability, often due to high SHBG. Associated with hypogonadal symptoms even when total testosterone is within the normal range.',
-  },
-  'Bilirubin total': {
-    min: 0.2, max: 1.2, unit: 'mg/dL', cat: 'Liver',
-    what: 'Total bilirubin measures the overall level of bilirubin in the blood — the yellow pigment produced when red blood cells break down. The liver processes bilirubin and excretes it in bile. Includes both direct (conjugated) and indirect (unconjugated) fractions.',
-    high: 'Elevated total bilirubin causes jaundice (yellowing of skin and eyes). Causes include liver disease, bile duct obstruction, hemolytic anemia, and Gilbert syndrome (a benign genetic condition causing mild elevation).',
-    low: 'Low bilirubin has no clinical significance and is not a concern.',
-  },
-  'Bilirubin Direct': {
-    min: 0.0, max: 0.3, unit: 'mg/dL', cat: 'Liver',
-    what: 'Direct (conjugated) bilirubin is the water-soluble form that has been processed by the liver and is ready for excretion in bile. Elevated direct bilirubin specifically points to liver or bile duct problems rather than hemolysis.',
-    high: 'Elevated direct bilirubin indicates the liver is processing bilirubin but cannot excrete it properly. Causes include bile duct obstruction (gallstones, tumors), cholestatic liver disease, and hepatitis.',
-    low: 'Low or undetectable direct bilirubin is normal and not clinically significant.',
-  },
-  'Alkaline Phosphatase': {
-    min: 40, max: 140, unit: 'IU/L', cat: 'Liver',
-    what: 'Alkaline phosphatase (ALP) is an enzyme found in the liver, bile ducts, and bone. It is a sensitive marker for bile duct obstruction and bone disorders. Normal levels vary with age — higher levels are expected in children and adolescents due to bone growth.',
-    high: 'Elevated ALP most commonly indicates bile duct obstruction (cholestasis) or bone disease. Liver causes include gallstones, primary biliary cholangitis, and infiltrative liver disease. Bone causes include Paget disease, fractures, and bone metastases.',
-    low: 'Low ALP is uncommon. May be seen with hypothyroidism, pernicious anemia, zinc deficiency, or hypophosphatasia (a rare genetic condition affecting bone mineralization).',
-  },
-  'Carbon Dioxide': {
-    min: 21, max: 35, unit: 'mmol/L', cat: 'Minerals',
-    what: 'Serum carbon dioxide (bicarbonate) reflects the body\'s acid-base balance. It is the main buffer in the blood and is regulated by both the kidneys and lungs. Part of the basic and comprehensive metabolic panel.',
-    high: 'High bicarbonate (metabolic alkalosis) can result from vomiting, diuretic use, or adrenal conditions. May also reflect compensation for chronic respiratory acidosis (e.g., COPD).',
-    low: 'Low bicarbonate (metabolic acidosis) occurs with kidney disease, diabetic ketoacidosis, severe diarrhea, or lactic acidosis. May also reflect compensation for hyperventilation.',
-  },
-  'Chloride': {
-    min: 98, max: 111, unit: 'mmol/L', cat: 'Minerals',
-    what: 'Chloride is the main negatively charged electrolyte in blood and body fluids. It works alongside sodium to maintain fluid balance, blood pressure, and proper acid-base balance. Usually measured as part of the metabolic panel.',
-    high: 'Hyperchloremia can indicate dehydration, kidney disease, or metabolic acidosis. Often rises when bicarbonate falls (they move inversely to maintain electrical balance).',
-    low: 'Hypochloremia is associated with prolonged vomiting, metabolic alkalosis, heart failure, or excessive sweating. Often occurs alongside low sodium.',
-  },
-  'Anion Gap': {
-    min: 3, max: 13, unit: 'mmol/L', cat: 'Minerals',
-    what: 'The anion gap is a calculated value (Sodium minus Chloride minus Bicarbonate) that reflects unmeasured negative ions in the blood. It is used to help identify the cause of metabolic acidosis.',
-    high: 'An elevated anion gap indicates the presence of abnormal acids in the blood. Classic causes include diabetic ketoacidosis, lactic acidosis, kidney failure, and toxic ingestions (methanol, ethylene glycol, salicylates).',
-    low: 'A low anion gap is uncommon and may indicate low albumin levels, multiple myeloma, or laboratory error.',
-  },
-  'Vitamin B6': {
-    min: 5, max: 50, unit: 'µg/L', cat: 'Vitamins',
-    what: 'Vitamin B6 (pyridoxine) is essential for protein metabolism, neurotransmitter synthesis (serotonin, dopamine, GABA), immune function, and red blood cell production. Found in poultry, fish, potatoes, and bananas.',
-    high: 'Excess vitamin B6 from supplements (typically above 200 mg/day for extended periods) can cause sensory neuropathy — numbness, tingling, and pain in the hands and feet. Dietary excess alone is rarely harmful.',
-    low: 'Deficiency causes peripheral neuropathy, dermatitis, glossitis (inflamed tongue), depression, confusion, and weakened immunity. More common in people with malabsorption, alcoholism, or taking certain medications like isoniazid.',
-  },
-  'MCV': {
-    min: 80, max: 100, unit: 'fL', cat: 'Blood',
-    what: 'Mean Corpuscular Volume measures the average size of red blood cells. It is used to classify anemia into subtypes — small cells (microcytic), normal cells (normocytic), or large cells (macrocytic) — which point to different underlying causes.',
-    high: 'High MCV (macrocytosis) indicates abnormally large red blood cells. Most commonly caused by vitamin B12 or folate deficiency, alcohol use, hypothyroidism, liver disease, or certain medications (methotrexate, hydroxyurea).',
-    low: 'Low MCV (microcytosis) indicates small red blood cells. Most commonly caused by iron deficiency anemia or thalassemia. Less common causes include anemia of chronic disease and lead poisoning.',
-  },
-  'MCH': {
-    min: 26, max: 34, unit: 'pg', cat: 'Blood',
-    what: 'Mean Corpuscular Hemoglobin measures the average amount of hemoglobin per red blood cell. It parallels MCV — large cells carry more hemoglobin, small cells carry less. Used alongside MCV to further classify anemia.',
-    high: 'Elevated MCH (hyperchromia) is seen in macrocytic anemias from B12 or folate deficiency. Not clinically significant on its own — interpreted with MCV.',
-    low: 'Low MCH (hypochromia) indicates pale, hemoglobin-poor red blood cells. Caused by iron deficiency, thalassemia, or other microcytic anemias. Cells appear pale on blood smear.',
-  },
-  'MCHC': {
-    min: 31, max: 37, unit: 'g/dL', cat: 'Blood',
-    what: 'Mean Corpuscular Hemoglobin Concentration measures the average concentration of hemoglobin within red blood cells. It is the most direct measure of whether red cells are adequately filled with hemoglobin.',
-    high: 'Elevated MCHC (hyperchromia) is rare and most classically associated with hereditary spherocytosis — a condition where red blood cells are small and spherical. Also seen in severe burns or cold agglutinin disease.',
-    low: 'Low MCHC indicates hypochromic (pale) red blood cells, typically caused by iron deficiency anemia or thalassemia. The cells have a larger pale center when viewed under a microscope.',
-  },
-  'RDW': {
-    min: 0, max: 14.5, unit: '%', cat: 'Blood',
-    what: 'Red Cell Distribution Width measures the variation in size among red blood cells. A high RDW means red cells are unequal in size (anisocytosis), which can help distinguish different types of anemia. A normal RDW with abnormal MCV narrows the diagnosis.',
-    high: 'Elevated RDW indicates mixed or variable red blood cell sizes. Seen in iron deficiency anemia, B12/folate deficiency, mixed nutritional deficiencies, myelodysplastic syndrome, and after recent blood transfusion.',
-    low: 'Low RDW (very uniform cell sizes) is generally not clinically significant. May be seen in thalassemia trait where cells are uniformly small.',
-  },
 
