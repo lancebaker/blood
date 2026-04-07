@@ -825,6 +825,14 @@ function renderReferenceBar(name, ref, currentVal, unit) {
 function renderTestInfo(name, ref) {
   const el = document.getElementById('testInfoPanel');
   if (!el) return;
+  // If ref not found directly, try fuzzy match (handles period variants etc.)
+  if (!ref || (!ref.what && !ref.high && !ref.low)) {
+    const normalized = name.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+    const fuzzyRef = Object.entries(RANGES).find(([k]) =>
+      k.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim() === normalized
+    );
+    if (fuzzyRef) ref = fuzzyRef[1];
+  }
   if (!ref || (!ref.what && !ref.high && !ref.low)) {
     el.style.display = 'none';
     return;
@@ -994,11 +1002,23 @@ function toast(msg, type = '') {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
 }
+  'Calc Free Testosterone (pg/mL)': {
+    min: 3.2, max: 19.0, unit: 'ng/dL', cat: 'Hormones',
+    what: 'Calculated free testosterone estimates the fraction of testosterone not bound to proteins, making it biologically active and available to tissues. Calculated using the Vermeulen formula from total testosterone, SHBG, and albumin.',
+    high: 'Elevated free testosterone in men may indicate exogenous testosterone use or certain adrenal conditions. In women, elevated levels are associated with PCOS, adrenal tumors, or anabolic steroid use.',
+    low: 'Low free testosterone causes the same symptoms as low total testosterone — fatigue, low libido, erectile dysfunction, reduced muscle mass, and depression — even when total testosterone appears borderline normal.',
+  },
   'Calc Free Testosterone': {
     min: 3.2, max: 19.0, unit: 'ng/dL', cat: 'Hormones',
     what: 'Calculated free testosterone estimates the fraction of testosterone not bound to proteins, making it biologically active and available to tissues. Calculated using the Vermeulen formula from total testosterone, SHBG, and albumin.',
     high: 'Elevated free testosterone in men may indicate exogenous testosterone use or certain adrenal conditions. In women, elevated levels are associated with PCOS, adrenal tumors, or anabolic steroid use.',
     low: 'Low free testosterone causes the same symptoms as low total testosterone — fatigue, low libido, erectile dysfunction, reduced muscle mass, and depression — even when total testosterone appears borderline normal.',
+  },
+  'Calc Bioav. Testosterone': {
+    min: 80.7, max: 446.7, unit: 'ng/dL', cat: 'Hormones',
+    what: 'Bioavailable testosterone includes both free testosterone and testosterone loosely bound to albumin. It represents the total amount of testosterone actually accessible to tissues. Calculated from total testosterone, SHBG, and albumin using the Vermeulen formula.',
+    high: 'Elevated bioavailable testosterone may indicate exogenous hormone use. In women, high levels suggest androgen excess conditions such as PCOS or adrenal overactivity.',
+    low: 'Low bioavailable testosterone is often more clinically meaningful than low total testosterone alone. Symptoms include fatigue, low libido, reduced strength and muscle mass, poor mood, and cognitive fog.',
   },
   'Calc Bioav Testosterone': {
     min: 80.7, max: 446.7, unit: 'ng/dL', cat: 'Hormones',
