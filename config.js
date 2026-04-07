@@ -8,7 +8,7 @@ const CONFIG = {
   CLIENT_ID: '475390764115-v3588flr9668gt9s0pqmoq31gjc2oepv.apps.googleusercontent.com',
 
   // The Drive API key (used for non-auth requests)
-    API_KEY: 'AIzaSyBlXuOdOjyXYXkGMzIvet4OAsuqxexe8Sw',
+  API_KEY: 'AIzaSyBlXuOdOjyXYXkGMzIvet4OAsuqxexe8Sw',
 
   // OAuth scopes — drive.file means the app can ONLY see files it creates
   SCOPES: 'https://www.googleapis.com/auth/drive.file',
