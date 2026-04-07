@@ -290,6 +290,16 @@ async function signIn() {
     showAuth('loading', 'Loading your lab data from Drive…');
     await afterSignIn();
   } catch(e) {
+    // If user just closed the popup, go back to sign-in screen quietly
+    if (e.message === 'Sign-in cancelled') {
+      showAuth('signIn');
+      return;
+    }
+    // Google API not ready yet — show a friendlier message
+    if (e.message && e.message.includes('not ready')) {
+      showAuth('error', 'Google sign-in is still loading. Please wait a moment and try again.');
+      return;
+    }
     showAuth('error', 'Sign-in failed. Please try again. (' + (e.message || e) + ')');
   }
 }

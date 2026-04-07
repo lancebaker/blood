@@ -66,14 +66,18 @@ const Drive = (() => {
      access. Combined with select_account hint, this gives
      a seamless re-auth on page load.
    ───────────────────────────────────────────────────── */
+  /* ── Silent refresh — only used on page load, with timeout ── */
   async function silentRefresh() {
     return new Promise((resolve, reject) => {
       const storedHint = localStorage.getItem('labtrack_email') || '';
+      // Timeout after 3 seconds — if Google doesn't respond, fail fast
+      const timeout = setTimeout(() => reject(new Error('silent_timeout')), 3000);
       const tc = google.accounts.oauth2.initTokenClient({
         client_id: CONFIG.CLIENT_ID,
         scope: CONFIG.SCOPES,
         hint: storedHint,
         callback: (resp) => {
+          clearTimeout(timeout);
           if (resp.error) { reject(new Error(resp.error)); return; }
           accessToken = resp.access_token;
           saveSession(resp.access_token, resp.expires_in || 3600);
@@ -86,12 +90,25 @@ const Drive = (() => {
 
   /* ── Init — check for stored session ─────────────── */
   async function init() {
-    // Wait for Google Identity Services to load
-    await new Promise((resolve) => {
+    // Wait for Google Identity Services to load (up to 5 seconds)
+    await new Promise((resolve, reject) => {
       if (typeof google !== 'undefined' && google.accounts) { resolve(); return; }
+      let waited = 0;
       const check = setInterval(() => {
-        if (typeof google !== 'undefined' && google.accounts) { clearInterval(check); resolve(); }
+        waited += 100;
+        if (typeof google !== 'undefined' && google.accounts) { clearInterval(check); resolve(); return; }
+        if (waited > 5000) { clearInterval(check); reject(new Error('Google API failed to load')); }
       }, 100);
+    });
+
+    // Pre-initialise the token client so it's ready when the button is clicked
+    // This avoids the "nothing happens" bug caused by initialising inside a click handler
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CONFIG.CLIENT_ID,
+      scope: CONFIG.SCOPES,
+      callback: (resp) => {
+        if (tokenClient._callback) tokenClient._callback(resp);
+      },
     });
 
     // Check for a stored valid session
@@ -99,42 +116,48 @@ const Drive = (() => {
     if (session) {
       accessToken = session.token;
       tokenExpiry = session.expiry;
-      return true; // has session
+      return true;
     }
-    return false; // needs sign in
+    return false;
   }
 
-  /* ── Sign in ──────────────────────────────────────── */
-  function initTokenClient(callback) {
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: CONFIG.CLIENT_ID,
-      scope: CONFIG.SCOPES,
-      callback: (resp) => {
-        if (resp.error) { callback(null, resp.error); return; }
+  /* ── Sign in — called directly from button click ──── */
+  async function signIn() {
+    // If we have a stored session, try silent refresh first (no popup)
+    if (loadSession()) {
+      try {
+        await silentRefresh();
+        return accessToken;
+      } catch(e) {
+        clearSession(); // Session stale — fall through to full sign-in
+      }
+    }
+
+    // Full sign-in with Google popup — must be called from a user gesture (button click)
+    return new Promise((resolve, reject) => {
+      if (!tokenClient) {
+        reject(new Error('Google API not ready. Please refresh the page.'));
+        return;
+      }
+      // Attach one-time callback
+      tokenClient._callback = (resp) => {
+        tokenClient._callback = null;
+        if (resp.error) {
+          // popup_closed_by_user is not a real error — user just closed the window
+          if (resp.error === 'popup_closed_by_user' || resp.error === 'access_denied') {
+            reject(new Error('Sign-in cancelled'));
+          } else {
+            reject(new Error(resp.error));
+          }
+          return;
+        }
         accessToken = resp.access_token;
         saveSession(resp.access_token, resp.expires_in || 3600);
-        // Store email hint for silent refresh
         getUserEmail().then(email => {
           if (email) localStorage.setItem('labtrack_email', email);
         });
-        callback(resp.access_token, null);
-      },
-    });
-  }
-
-  async function signIn() {
-    // First try a silent refresh (no UI prompt)
-    try {
-      await silentRefresh();
-      return accessToken;
-    } catch(e) {
-      // Silent failed — show the full Google sign-in UI
-    }
-    return new Promise((resolve, reject) => {
-      initTokenClient((token, err) => {
-        if (err) reject(new Error(err));
-        else resolve(token);
-      });
+        resolve(resp.access_token);
+      };
       tokenClient.requestAccessToken({ prompt: 'select_account' });
     });
   }
