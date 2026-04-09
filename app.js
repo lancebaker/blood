@@ -450,7 +450,7 @@ async function syncNow() {
       db.sort((a, b) => a.date.localeCompare(b.date));
     }
     renderDashboard();
-    populateTrendSelect();
+    renderTrendCategoryPills();
     renderHistory();
     updateSyncStatus('synced');
     toast('Data synced from Drive', 'success');
@@ -496,7 +496,7 @@ async function handleFileUpload(input) {
   renderImportLog(allLogs);
   await saveToDrive();
   renderDashboard();
-  populateTrendSelect();
+  renderTrendCategoryPills();
   renderHistory();
   toast(`Imported ${files.length} file${files.length > 1 ? 's' : ''}`, 'success');
 }
@@ -781,8 +781,20 @@ function renderTestGrid() {
 }
 
 function openTest(name) {
+  // Find which category this test belongs to
+  const ref = RANGES[name] || (() => {
+    const norm = name.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim();
+    const found = Object.entries(RANGES).find(([k]) => k.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim() === norm);
+    return found ? found[1] : null;
+  })();
+  const cat = ref ? ref.cat : 'Other';
+  activeTrendCat = cat;
   switchView('trends', document.querySelector('[data-view=trends]'));
-  setTimeout(() => { document.getElementById('trendTestSelect').value = name; renderTrendChart(); }, 60);
+  // Scroll to the specific test block after render
+  setTimeout(() => {
+    const block = document.getElementById('block-' + CSS.escape(name));
+    if (block) block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 200);
 }
 
 /* ── Status helpers ───────────────────────────────── */
@@ -800,41 +812,150 @@ function statusBadge(status) {
 }
 
 /* ── Trends ───────────────────────────────────────── */
-function populateTrendSelect() {
-  const names = [...new Set(db.map(r => r.test_name))].sort();
-  const sel = document.getElementById('trendTestSelect');
-  const current = sel.value;
-  sel.innerHTML = '<option value="">— choose a test —</option>' +
-    names.map(n => `<option value="${n}" ${n === current ? 'selected' : ''}>${n}</option>`).join('');
+/* ── Trend category state ───────────────────────────── */
+let activeTrendCat = null;
+let trendChartInstances = {};
+
+function getGroupedTests() {
+  const names = [...new Set(db.map(r => r.test_name))];
+  const grouped = {};
+  names.forEach(name => {
+    const ref = RANGES[name] || Object.values(RANGES).find((v, i) =>
+      Object.keys(RANGES)[i].toLowerCase().replace(/[^a-z0-9 ]/g,'').trim() ===
+      name.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim()
+    );
+    const cat = ref ? ref.cat : 'Other';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(name);
+  });
+  Object.keys(grouped).forEach(cat => {
+    if (cat === 'Hormones') {
+      grouped[cat].sort((a, b) => {
+        const ai = HORMONE_ORDER.indexOf(a), bi = HORMONE_ORDER.indexOf(b);
+        if (ai >= 0 && bi >= 0) return ai - bi;
+        if (ai >= 0) return -1; if (bi >= 0) return 1;
+        return a.localeCompare(b);
+      });
+    } else { grouped[cat].sort(); }
+  });
+  return grouped;
 }
 
-function renderTrendChart() {
-  const name = document.getElementById('trendTestSelect').value;
-  const wrap = document.getElementById('trendChartWrap');
+function populateTrendSelect() {
+  // legacy no-op — trends now uses category view
+}
+
+function renderTrendCategoryPills() {
+  const grouped = getGroupedTests();
+  const pills = document.getElementById('trendCatPills');
   const empty = document.getElementById('emptyTrends');
-  if (!name) { wrap.style.display = 'none'; empty.style.display = 'block'; return; }
+  if (!db.length) { pills.innerHTML = ''; empty.classList.add('visible'); return; }
+  empty.classList.remove('visible');
 
-  const rows = db.filter(r => r.test_name === name).sort((a, b) => a.date.localeCompare(b.date));
-  if (!rows.length) { wrap.style.display = 'none'; empty.style.display = 'block'; return; }
-  wrap.style.display = 'block';
-  empty.style.display = 'none';
+  const cats = [...CATEGORY_ORDER.filter(c => grouped[c]), ...Object.keys(grouped).filter(c => !CATEGORY_ORDER.includes(c)).sort()];
+  if (!activeTrendCat || !grouped[activeTrendCat]) activeTrendCat = cats[0];
 
-  const ref = RANGES[name];
+  pills.innerHTML = cats.map(cat => `
+    <button class="cat-pill ${cat === activeTrendCat ? 'active' : ''}"
+      onclick="selectTrendCat('${cat}')">${cat}
+      <span style="font-size:10px;opacity:0.6;margin-left:4px">${grouped[cat].length}</span>
+    </button>`).join('');
+
+  renderTrendCategory(activeTrendCat, grouped);
+}
+
+function selectTrendCat(cat) {
+  activeTrendCat = cat;
+  // Destroy all existing charts
+  Object.values(trendChartInstances).forEach(c => c.destroy());
+  trendChartInstances = {};
+  renderTrendCategoryPills();
+}
+
+function renderTrendCategory(cat, grouped) {
+  const container = document.getElementById('trendCategoryView');
+  const tests = grouped[cat] || [];
+
+  container.innerHTML = tests.map(name => `
+    <div class="trend-test-block" id="block-${CSS.escape(name)}">
+      <div class="trend-block-header">
+        <div class="trend-block-name">${name}</div>
+        <div class="trend-block-badges" id="badges-${CSS.escape(name)}"></div>
+      </div>
+      <div class="chart-container" style="height:200px"><canvas id="chart-${CSS.escape(name)}"></canvas></div>
+      <div class="reference-bar" id="refbar-${CSS.escape(name)}"></div>
+      <div class="test-info-panel" id="info-${CSS.escape(name)}" style="display:none"></div>
+      <button class="info-toggle" onclick="toggleTestInfo('${name.replace(/'/g,"\'")}')">About this test ▾</button>
+    </div>
+  `).join('');
+
+  // Render each chart after DOM is ready
+  requestAnimationFrame(() => {
+    tests.forEach(name => renderSingleTrendChart(name));
+  });
+}
+
+function toggleTestInfo(name) {
+  const el = document.getElementById('info-' + CSS.escape(name));
+  if (!el) return;
+  if (el.style.display === 'block') {
+    el.style.display = 'none';
+    el.previousElementSibling.previousElementSibling.textContent = 'About this test ▾';
+    return;
+  }
+  // Find ref with fuzzy match
+  let ref = RANGES[name];
+  if (!ref) {
+    const normalized = name.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim();
+    const found = Object.entries(RANGES).find(([k]) =>
+      k.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim() === normalized);
+    if (found) ref = found[1];
+  }
+  if (!ref || (!ref.what && !ref.high && !ref.low)) return;
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="info-panel-title">About this test</div>
+    ${ref.what ? `<div class="info-section"><div class="info-label">What it measures</div><p class="info-text">${ref.what}</p></div>` : ''}
+    ${ref.high ? `<div class="info-section"><div class="info-label high-label">If high</div><p class="info-text">${ref.high}</p></div>` : ''}
+    ${ref.low  ? `<div class="info-section"><div class="info-label low-label">If low</div><p class="info-text">${ref.low}</p></div>` : ''}
+  `;
+  el.previousElementSibling.textContent = 'About this test ▴';
+}
+
+function renderSingleTrendChart(name) {
+  const rows = db.filter(r => r.test_name === name).sort((a,b) => a.date.localeCompare(b.date));
+  if (!rows.length) return;
+
+  const ref = RANGES[name] || (() => {
+    const norm = name.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim();
+    const found = Object.entries(RANGES).find(([k]) => k.toLowerCase().replace(/[^a-z0-9 ]/g,'').trim() === norm);
+    return found ? found[1] : null;
+  })();
+
   const latest = rows[rows.length - 1];
   const status = getStatus(latest.value, ref);
   const unit = latest.unit || (ref ? ref.unit : '');
   let trend = '';
   if (rows.length >= 2) {
-    const d = latest.value - rows[rows.length - 2].value;
+    const d = latest.value - rows[rows.length-2].value;
     trend = d > 0 ? '↑' : d < 0 ? '↓' : '→';
   }
 
-  document.getElementById('trendMeta').innerHTML = `
-    <div class="stat-card"><div class="stat-label">Latest</div><div class="stat-value">${parseFloat(latest.value.toFixed(2))} <span style="font-size:13px;color:var(--text-3)">${unit}</span></div></div>
-    <div class="stat-card"><div class="stat-label">Status</div><div class="stat-value ${status}">${{ok:'Normal',low:'Low',high:'High',unknown:'—'}[status]}</div></div>
-    <div class="stat-card"><div class="stat-label">Readings</div><div class="stat-value">${rows.length}</div></div>
-    <div class="stat-card"><div class="stat-label">Trend</div><div class="stat-value">${trend || '—'}</div></div>
-  `;
+  // Badges
+  const badges = document.getElementById('badges-' + CSS.escape(name));
+  if (badges) {
+    const statusLabel = {ok:'Normal',low:'Low',high:'High',unknown:'—'}[status] || '—';
+    badges.innerHTML = `
+      <span class="tc-badge ${status}">${statusLabel}</span>
+      <span style="font-family:var(--mono);font-size:13px;color:var(--text);margin-left:8px">${parseFloat(latest.value.toFixed(2))} <span style="color:var(--text-3);font-size:11px">${unit}</span></span>
+      ${trend ? `<span style="font-size:14px;margin-left:6px;color:var(--text-2)">${trend}</span>` : ''}
+    `;
+  }
+
+  // Chart
+  const canvas = document.getElementById('chart-' + CSS.escape(name));
+  if (!canvas) return;
+  if (trendChartInstances[name]) { trendChartInstances[name].destroy(); }
 
   const pointColors = rows.map(r => {
     const s = getStatus(r.value, ref);
@@ -842,23 +963,17 @@ function renderTrendChart() {
   });
 
   const datasets = [{
-    label: name,
-    data: rows.map(r => r.value),
-    borderColor: '#4fffb0',
-    backgroundColor: 'rgba(79,255,176,0.06)',
-    pointBackgroundColor: pointColors,
-    pointBorderColor: pointColors,
-    pointRadius: 5, pointHoverRadius: 7,
-    fill: true, tension: 0.35, borderWidth: 2,
+    label: name, data: rows.map(r => r.value),
+    borderColor: '#4fffb0', backgroundColor: 'rgba(79,255,176,0.06)',
+    pointBackgroundColor: pointColors, pointBorderColor: pointColors,
+    pointRadius: 5, pointHoverRadius: 7, fill: true, tension: 0.35, borderWidth: 2,
   }];
-
   if (ref) {
-    datasets.push({ label: 'Upper limit', data: rows.map(() => ref.max), borderColor: 'rgba(255,92,92,0.35)', borderDash: [4,4], borderWidth: 1, pointRadius: 0, fill: false });
-    if (ref.min > 0) datasets.push({ label: 'Lower limit', data: rows.map(() => ref.min), borderColor: 'rgba(245,166,35,0.35)', borderDash: [4,4], borderWidth: 1, pointRadius: 0, fill: false });
+    datasets.push({ label: 'Max', data: rows.map(() => ref.max), borderColor: 'rgba(255,92,92,0.35)', borderDash: [4,4], borderWidth: 1, pointRadius: 0, fill: false });
+    if (ref.min > 0) datasets.push({ label: 'Min', data: rows.map(() => ref.min), borderColor: 'rgba(245,166,35,0.35)', borderDash: [4,4], borderWidth: 1, pointRadius: 0, fill: false });
   }
 
-  if (trendChartInstance) { trendChartInstance.destroy(); trendChartInstance = null; }
-  trendChartInstance = new Chart(document.getElementById('trendChart').getContext('2d'), {
+  trendChartInstances[name] = new Chart(canvas.getContext('2d'), {
     type: 'line',
     data: { labels: rows.map(r => r.date), datasets },
     options: {
@@ -872,17 +987,48 @@ function renderTrendChart() {
         }
       },
       scales: {
-        x: { ticks: { color: '#55556a', font: { family: 'DM Mono', size: 11 }, maxRotation: 45, maxTicksLimit: 8 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: 'rgba(255,255,255,0.07)' } },
-        y: { ticks: { color: '#55556a', font: { family: 'DM Mono', size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: 'rgba(255,255,255,0.07)' } }
+        x: { ticks: { color: '#55556a', font: { family: 'DM Mono', size: 10 }, maxRotation: 45, maxTicksLimit: 6 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: 'rgba(255,255,255,0.07)' } },
+        y: { ticks: { color: '#55556a', font: { family: 'DM Mono', size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: 'rgba(255,255,255,0.07)' } }
       }
     }
   });
 
-  renderReferenceBar(name, ref, latest.value, unit);
-  renderTestInfo(name, ref);
-  renderTestHistory(rows, unit);
-  renderTestHistory(rows, unit);
+  // Reference bar
+  renderInlineRefBar(name, ref, latest.value, unit);
 }
+
+function renderInlineRefBar(name, ref, currentVal, unit) {
+  const el = document.getElementById('refbar-' + CSS.escape(name));
+  if (!el) return;
+  if (!ref) { el.style.display = 'none'; return; }
+  const span = ref.max - ref.min;
+  const paddedMin = ref.min - span * 0.3;
+  const paddedMax = ref.max + span * 0.3;
+  const total = paddedMax - paddedMin;
+  const pct = Math.min(98, Math.max(2, ((currentVal - paddedMin) / total) * 100));
+  const normalLeft = ((ref.min - paddedMin) / total) * 100;
+  const normalWidth = (span / total) * 100;
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-2);margin-bottom:4px">
+      <span style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:0.06em">Reference range</span>
+      <span style="font-family:var(--mono)">${ref.min}–${ref.max} ${unit}</span>
+    </div>
+    <div class="ref-range-track">
+      <div class="ref-range-normal" style="left:${normalLeft.toFixed(1)}%;width:${normalWidth.toFixed(1)}%"></div>
+      <div class="ref-marker" style="left:${pct.toFixed(1)}%"></div>
+    </div>
+    <div class="ref-labels">
+      <span>${paddedMin.toFixed(1)}</span>
+      <span>${ref.min} (low)</span>
+      <span>${ref.max} (high)</span>
+      <span>${paddedMax.toFixed(1)}</span>
+    </div>
+  `;
+}
+
+
+function renderTrendChart() { /* replaced by renderTrendCategoryPills */ }
+
 
 function renderReferenceBar(name, ref, currentVal, unit) {
   const el = document.getElementById('referenceBar');
@@ -1050,7 +1196,7 @@ async function clearAllData() {
   db = [];
   await Drive.deleteDataFile();
   renderDashboard();
-  populateTrendSelect();
+  renderTrendCategoryPills();
   renderHistory();
   document.getElementById('importLog').style.display = 'none';
   toast('All data cleared');
@@ -1066,7 +1212,7 @@ function switchView(name, btn) {
   document.getElementById('viewTitle').textContent = titles[name] || name;
   if (window.innerWidth < 700) closeSidebar();
   if (name === 'history') renderHistory();
-  if (name === 'trends') populateTrendSelect();
+  if (name === 'trends') renderTrendCategoryPills();
 }
 
 function toggleSidebar() {

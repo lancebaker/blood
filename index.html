@@ -153,22 +153,12 @@
     <!-- TRENDS -->
     <section class="view" id="view-trends">
       <div class="view-inner">
-        <div class="trends-select-wrap">
-          <label class="field-label">Select test</label>
-          <select id="trendTestSelect" onchange="renderTrendChart()" class="field-select">
-            <option value="">— choose a test —</option>
-          </select>
-        </div>
-        <div id="trendChartWrap" style="display:none">
-          <div class="trend-meta" id="trendMeta"></div>
-          <div class="chart-container"><canvas id="trendChart"></canvas></div>
-          <div class="reference-bar" id="referenceBar"></div>
-          <div class="test-info-panel" id="testInfoPanel" style="display:none"></div>
-          <div id="trendHistory"></div>
-        </div>
+        <div class="cat-pills-wrap" id="trendCatPills"></div>
+        <div id="trendCategoryView"></div>
         <div class="empty-dashboard" id="emptyTrends">
           <div class="empty-icon">◎</div>
-          <p>Select a test above to view its trend.</p>
+          <p>No lab data yet.</p>
+          <p class="empty-sub">Import a CSV to start tracking trends.</p>
         </div>
       </div>
     </section>

@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#f5f1e8">
+    <title>Reflections Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;600&family=Lora:ital,wght@0,400;0,600;1,400&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --cream: #f5f1e8;
+            --warm-white: #fdfcfa;
+            --sage: #9e7f61;
+            --deep-sage: #6b5d52;
+            --soft-green: #a8b5a0;
+            --text-dark: #3a3330;
+            --text-muted: #8a7d75;
+            --accent: #d4a574;
+            --border: rgba(158, 127, 97, 0.15);
+        }
+        
+        body {
+            font-family: 'Lora', serif;
+            background: linear-gradient(135deg, var(--cream) 0%, var(--warm-white) 100%);
+            color: var(--text-dark);
+            min-height: 100vh;
+            padding: 40px 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            right: -10%;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(168, 181, 160, 0.08) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: float 20s ease-in-out infinite;
+            z-index: 0;
+        }
+        
+        body::after {
+            content: '';
+            position: fixed;
+            bottom: -30%;
+            left: -10%;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(212, 165, 116, 0.06) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: float 25s ease-in-out infinite reverse;
+            z-index: 0;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: fadeIn 1s ease-out;
+        }
+        
+        .header h1 {
+            font-family: 'Crimson Pro', serif;
+            font-size: 3rem;
+            font-weight: 300;
+            color: var(--deep-sage);
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+        }
+        
+        .header .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        
+        .last-updated {
+            text-align: center;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 40px;
+            letter-spacing: 1px;
+        }
+
+        .tree-section {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border-radius: 2px;
+            padding: 50px 40px;
+            box-shadow: 0 10px 40px rgba(58, 51, 48, 0.06);
+            border: 1px solid var(--border);
+            margin-bottom: 40px;
+            text-align: center;
+            animation: slideUp 0.5s ease-out backwards;
+        }
+
+        .tree-title {
+            font-family: 'Crimson Pro', serif;
+            font-size: 1.8rem;
+            color: var(--deep-sage);
+            margin-bottom: 10px;
+            font-weight: 400;
+            letter-spacing: 1px;
+        }
+
+        .tree-subtitle {
+            font-size: 1rem;
+            color: var(--text-muted);
+            font-style: italic;
+            margin-bottom: 35px;
+        }
+
+        #livingTree {
+            max-width: 400px;
+            margin: 0 auto 30px;
+            filter: drop-shadow(0 10px 30px rgba(58, 51, 48, 0.1));
+        }
+
+        .tree-message {
+            font-size: 1.1rem;
+            color: var(--text-dark);
+            line-height: 1.7;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border-radius: 2px;
+            padding: 35px 30px;
+            box-shadow: 0 10px 40px rgba(58, 51, 48, 0.06);
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+            animation: slideUp 0.6s ease-out backwards;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0.4;
+        }
+        
+        .stat-card.highlight::before {
+            background: linear-gradient(90deg, transparent, var(--sage), transparent);
+        }
+        
+        .stat-label {
+            font-family: 'Crimson Pro', serif;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .stat-value {
+            font-family: 'Crimson Pro', serif;
+            font-size: 3rem;
+            color: var(--deep-sage);
+            font-weight: 600;
+            line-height: 1;
+            margin-bottom: 10px;
+        }
+        
+        .stat-subtext {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        
+        .chart-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .chart-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border-radius: 2px;
+            padding: 40px 35px;
+            box-shadow: 0 10px 40px rgba(58, 51, 48, 0.06);
+            border: 1px solid var(--border);
+            animation: slideUp 0.8s ease-out backwards;
+        }
+        
+        .chart-title {
+            font-family: 'Crimson Pro', serif;
+            font-size: 1.4rem;
+            color: var(--deep-sage);
+            margin-bottom: 25px;
+            font-weight: 400;
+            letter-spacing: 1px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        .gratitude-section {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border-radius: 2px;
+            padding: 45px 40px;
+            box-shadow: 0 10px 40px rgba(58, 51, 48, 0.06);
+            border: 1px solid var(--border);
+            margin-bottom: 40px;
+            animation: slideUp 1s ease-out backwards;
+        }
+        
+        .gratitude-title {
+            font-family: 'Crimson Pro', serif;
+            font-size: 1.8rem;
+            color: var(--deep-sage);
+            margin-bottom: 30px;
+            font-weight: 400;
+            letter-spacing: 1px;
+            text-align: center;
+        }
+        
+        .gratitude-entries {
+            display: grid;
+            gap: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+        
+        .gratitude-entry {
+            padding: 25px;
+            background: rgba(255, 255, 255, 0.5);
+            border-left: 3px solid var(--sage);
+            border-radius: 2px;
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        .gratitude-date {
+            font-family: 'Crimson Pro', serif;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+        
+        .gratitude-text {
+            font-size: 1.05rem;
+            line-height: 1.7;
+            color: var(--text-dark);
+            font-style: italic;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 100px 20px;
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        
+        .error {
+            text-align: center;
+            padding: 100px 20px;
+            font-size: 1.1rem;
+            color: var(--accent);
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes float {
+            0%, 100% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+            33% {
+                transform: translate(30px, -30px) rotate(5deg);
+            }
+            66% {
+                transform: translate(-20px, 20px) rotate(-5deg);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .chart-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>My Journey</h1>
+            <div class="subtitle">A visual meditation on practice and presence</div>
+        </div>
+        
+        <div id="dashboard">
+            <div class="loading">Loading your reflections...</div>
+        </div>
+    </div>
+
+    <script>
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzuSINl0QEHcJCSVn86oucy7BYMfvdt8rozr4JFwxy8PEDcOANefOgxlm_j8VpHC4YAeg/exec';
+        
+        // Weekly goals (tasks per week)
+        const WEEKLY_GOALS = {
+            liftToday: 2,
+            heartMath: 7,
+            readToday: 7,
+            probabilityCourse: 7,
+            instrument: 3,
+            gatewayTapes: 2,
+            artJournal: 1,
+            gratitude: 7  // Daily gratitude
+        };
+
+        const TOTAL_WEEKLY_TASKS = Object.values(WEEKLY_GOALS).reduce((a, b) => a + b, 0); // 36
+        
+        async function loadData() {
+            try {
+                const response = await fetch(SCRIPT_URL);
+                const rows = await response.json();
+                
+                if (rows.length <= 1) {
+                    document.getElementById('dashboard').innerHTML = '<div class="error">No data yet! Complete your first check-in to see your dashboard come alive.</div>';
+                    return;
+                }
+                
+                // Parse data (skip header row)
+                const data = rows.slice(1).map(row => {
+                    return {
+                        timestamp: row[0] || '',
+                        date: row[1] || '',
+                        liftToday: row[2] || '',
+                        heartMath: row[3] || '',
+                        readToday: row[4] || '',
+                        probabilityCourse: row[5] || '',
+                        instrument: row[6] || '',
+                        instrumentsPlayed: row[7] || '',
+                        gatewayTapes: row[8] || '',
+                        artJournal: row[9] || '',
+                        gratitude: row[10] || ''
+                    };
+                }).reverse(); // Most recent first
+                
+                renderDashboard(data);
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('dashboard').innerHTML = '<div class="error">Unable to load data. Make sure your Google Apps Script is properly deployed.</div>';
+            }
+        }
+        
+        function getWeekStart(date) {
+            const d = new Date(date);
+            d.setHours(12, 0, 0, 0); // Noon to avoid timezone issues
+            const day = d.getDay(); // 0 = Sunday, 1 = Monday, etc.
+            // Calculate days since Monday (treat Sunday as 6 days after Monday)
+            const diff = day === 0 ? 6 : day - 1;
+            const monday = new Date(d);
+            monday.setDate(d.getDate() - diff);
+            monday.setHours(12, 0, 0, 0);
+            return monday;
+        }
+
+        function calculateWeeklyScore(weekData) {
+            const counts = {
+                liftToday: 0,
+                heartMath: 0,
+                readToday: 0,
+                probabilityCourse: 0,
+                instrument: 0,
+                gatewayTapes: 0,
+                artJournal: 0,
+                gratitude: 0
+            };
+
+            weekData.forEach(d => {
+                if (d.liftToday === 'Yes') counts.liftToday++;
+                if (d.heartMath === 'Yes') counts.heartMath++;
+                if (d.readToday === 'Yes') counts.readToday++;
+                if (d.probabilityCourse === 'Yes') counts.probabilityCourse++;
+                if (d.instrument === 'Yes') counts.instrument++;
+                if (d.gatewayTapes === 'Yes') counts.gatewayTapes++;
+                if (d.artJournal === 'Yes') counts.artJournal++;
+                if (d.gratitude && d.gratitude.trim()) counts.gratitude++;
+            });
+
+            // Calculate actual tasks completed (capped at weekly goals)
+            let totalCompleted = 0;
+            for (let key in counts) {
+                totalCompleted += Math.min(counts[key], WEEKLY_GOALS[key]);
+            }
+
+            return {
+                completed: totalCompleted,
+                total: TOTAL_WEEKLY_TASKS,
+                percentage: Math.round((totalCompleted / TOTAL_WEEKLY_TASKS) * 100),
+                counts: counts
+            };
+        }
+
+        function parseDate(dateStr) {
+            if (!dateStr) return null;
+            
+            // If it's already a Date object, return it
+            if (dateStr instanceof Date) return dateStr;
+            
+            // Convert to string
+            const str = dateStr.toString().trim();
+            
+            // Handle US format like "4/7/2026" or "04/07/2026"
+            const usMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (usMatch) {
+                const month = parseInt(usMatch[1]) - 1; // JS months are 0-indexed
+                const day = parseInt(usMatch[2]);
+                const year = parseInt(usMatch[3]);
+                const d = new Date(year, month, day, 12, 0, 0);
+                return d;
+            }
+            
+            // Try ISO timestamp format
+            if (str.includes('T')) {
+                return new Date(str.split('T')[0] + 'T12:00:00Z');
+            }
+            
+            // Try parsing as-is
+            const parsed = new Date(str);
+            if (!isNaN(parsed.getTime())) {
+                parsed.setHours(12, 0, 0, 0);
+                return parsed;
+            }
+            
+            return null;
+        }
+
+        function getCurrentWeekData(data) {
+            const now = new Date();
+            now.setHours(12, 0, 0, 0);
+            const weekStart = getWeekStart(now);
+            
+            return data.filter(d => {
+                const entryDate = parseDate(d.date);
+                if (!entryDate) return false;
+                
+                const entryWeekStart = getWeekStart(entryDate);
+                return entryWeekStart.getTime() === weekStart.getTime();
+            });
+        }
+
+        function getTreeState(percentage) {
+            if (percentage < 50) {
+                return {
+                    state: 'wilting',
+                    message: 'Your tree needs nourishment. Every small practice brings it back to life.',
+                    trunkColor: '#8a7d75',
+                    leavesColor: '#a8977a',
+                    transform: 'translate(0, 10)',
+                    leavesOpacity: 0.6
+                };
+            } else if (percentage < 75) {
+                return {
+                    state: 'growing',
+                    message: 'Your tree is growing steadily. Roots deepening, branches reaching.',
+                    trunkColor: '#6b5d52',
+                    leavesColor: '#a8b5a0',
+                    transform: 'translate(0, 0)',
+                    leavesOpacity: 0.85
+                };
+            } else if (percentage < 90) {
+                return {
+                    state: 'flourishing',
+                    message: 'Your tree flourishes! Strong, vibrant, alive with possibility.',
+                    trunkColor: '#6b5d52',
+                    leavesColor: '#7fa872',
+                    transform: 'translate(0, -5)',
+                    leavesOpacity: 1
+                };
+            } else {
+                return {
+                    state: 'radiant',
+                    message: 'Your tree radiates brilliance. A testament to devoted practice.',
+                    trunkColor: '#5a4d42',
+                    leavesColor: '#6b9e5f',
+                    transform: 'translate(0, -8)',
+                    leavesOpacity: 1,
+                    glow: true
+                };
+            }
+        }
+
+        function renderTree(percentage) {
+            const state = getTreeState(percentage);
+            
+            return `
+                <svg id="livingTree" viewBox="0 0 200 280" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        ${state.glow ? `
+                            <filter id="glow">
+                                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                                <feMerge>
+                                    <feMergeNode in="coloredBlur"/>
+                                    <feMergeNode in="SourceGraphic"/>
+                                </feMerge>
+                            </filter>
+                        ` : ''}
+                    </defs>
+                    
+                    <!-- Ground -->
+                    <ellipse cx="100" cy="260" rx="80" ry="15" fill="#d4c4b0" opacity="0.4"/>
+                    
+                    <!-- Trunk -->
+                    <path d="M 85 260 Q 85 200, 88 150 Q 90 100, 92 80 Q 93 50, 95 30" 
+                          stroke="${state.trunkColor}" 
+                          stroke-width="12" 
+                          fill="none" 
+                          stroke-linecap="round"/>
+                    <path d="M 115 260 Q 115 200, 112 150 Q 110 100, 108 80 Q 107 50, 105 30" 
+                          stroke="${state.trunkColor}" 
+                          stroke-width="12" 
+                          fill="none" 
+                          stroke-linecap="round"/>
+                    
+                    <!-- Branches -->
+                    <g transform="${state.transform}" opacity="${state.leavesOpacity}">
+                        <path d="M 95 120 Q 70 110, 50 100" stroke="${state.trunkColor}" stroke-width="6" fill="none" stroke-linecap="round"/>
+                        <path d="M 105 120 Q 130 110, 150 100" stroke="${state.trunkColor}" stroke-width="6" fill="none" stroke-linecap="round"/>
+                        <path d="M 92 80 Q 65 70, 45 65" stroke="${state.trunkColor}" stroke-width="5" fill="none" stroke-linecap="round"/>
+                        <path d="M 108 80 Q 135 70, 155 65" stroke="${state.trunkColor}" stroke-width="5" fill="none" stroke-linecap="round"/>
+                        <path d="M 94 50 Q 75 45, 60 42" stroke="${state.trunkColor}" stroke-width="4" fill="none" stroke-linecap="round"/>
+                        <path d="M 106 50 Q 125 45, 140 42" stroke="${state.trunkColor}" stroke-width="4" fill="none" stroke-linecap="round"/>
+                        
+                        <!-- Leaves/Canopy -->
+                        <circle cx="50" cy="100" r="25" fill="${state.leavesColor}" ${state.glow ? 'filter="url(#glow)"' : ''}/>
+                        <circle cx="150" cy="100" r="25" fill="${state.leavesColor}" ${state.glow ? 'filter="url(#glow)"' : ''}/>
+                        <circle cx="45" cy="65" r="22" fill="${state.leavesColor}" ${state.glow ? 'filter="url(#glow)"' : ''}/>
+                        <circle cx="155" cy="65" r="22" fill="${state.leavesColor}" ${state.glow ? 'filter="url(#glow)"' : ''}/>
+                        <circle cx="60" cy="42" r="18" fill="${state.leavesColor}" ${state.glow ? 'filter="url(#glow)"' : ''}/>
+                        <circle cx="140" cy="42" r="18" fill="${state.leavesColor}" ${state.glow ? 'filter="url(#glow)"' : ''}/>
+                        <circle cx="100" cy="35" r="28" fill="${state.leavesColor}" ${state.glow ? 'filter="url(#glow)"' : ''}/>
+                        <circle cx="85" cy="55" r="20" fill="${state.leavesColor}" ${state.glow ? 'filter="url(#glow)"' : ''}/>
+                        <circle cx="115" cy="55" r="20" fill="${state.leavesColor}" ${state.glow ? 'filter="url(#glow)"' : ''}/>
+                        <circle cx="75" cy="80" r="23" fill="${state.leavesColor}" ${state.glow ? 'filter="url(#glow)"' : ''}/>
+                        <circle cx="125" cy="80" r="23" fill="${state.leavesColor}" ${state.glow ? 'filter="url(#glow)"' : ''}/>
+                        <circle cx="100" cy="70" r="26" fill="${state.leavesColor}" ${state.glow ? 'filter="url(#glow)"' : ''}/>
+                    </g>
+                    
+                    ${state.glow ? `
+                        <!-- Golden highlights for radiant state -->
+                        <circle cx="100" cy="35" r="8" fill="#d4a574" opacity="0.6"/>
+                        <circle cx="85" cy="55" r="6" fill="#d4a574" opacity="0.5"/>
+                        <circle cx="115" cy="55" r="6" fill="#d4a574" opacity="0.5"/>
+                    ` : ''}
+                </svg>
+                <div class="tree-message">${state.message}</div>
+            `;
+        }
+        
+        function renderDashboard(data) {
+            const totalDays = data.length;
+            const currentStreak = calculateStreak(data);
+            const lastEntry = data[0];
+            
+            // Current week data
+            const currentWeekData = getCurrentWeekData(data);
+            const weeklyScore = calculateWeeklyScore(currentWeekData);
+            
+            // Calculate weekly scores for trend
+            const weeklyScores = calculateWeeklyTrends(data);
+            
+            // Format last entry date nicely
+            const lastDate = parseDate(lastEntry.date);
+            const formattedDate = lastDate ? lastDate.toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            }) : 'Unknown';
+            
+            // Render HTML
+            const html = `
+                <div class="last-updated">Last Reflection: ${formattedDate}</div>
+                
+                <div class="tree-section">
+                    <div class="tree-title">The Living Tree</div>
+                    <div class="tree-subtitle">This week: ${weeklyScore.completed} of ${weeklyScore.total} tasks (${weeklyScore.percentage}%)</div>
+                    ${renderTree(weeklyScore.percentage)}
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card highlight">
+                        <div class="stat-label">This Week's Score</div>
+                        <div class="stat-value">${weeklyScore.completed}/${weeklyScore.total}</div>
+                        <div class="stat-subtext">${weeklyScore.percentage}% complete</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">Current Check-In Streak</div>
+                        <div class="stat-value">${currentStreak}</div>
+                        <div class="stat-subtext">days of presence</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">Total Reflections</div>
+                        <div class="stat-value">${totalDays}</div>
+                        <div class="stat-subtext">moments captured</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">Check-ins This Week</div>
+                        <div class="stat-value">${currentWeekData.length}/7</div>
+                        <div class="stat-subtext">days reflected</div>
+                    </div>
+                </div>
+                
+                <div class="chart-section">
+                    <div class="chart-card">
+                        <div class="chart-title">Weekly Progress</div>
+                        <div class="chart-container">
+                            <canvas id="weeklyTrendChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-card">
+                        <div class="chart-title">This Week's Breakdown</div>
+                        <div class="chart-container">
+                            <canvas id="weekBreakdownChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="gratitude-section">
+                    <div class="gratitude-title">Recent Gratitude 🌿</div>
+                    <div class="gratitude-entries">
+                        ${data.filter(d => d.gratitude).slice(0, 10).map(d => `
+                            <div class="gratitude-entry">
+                                <div class="gratitude-date">${d.date}</div>
+                                <div class="gratitude-text">${d.gratitude}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('dashboard').innerHTML = html;
+            
+            // Create charts
+            createWeeklyTrendChart(weeklyScores);
+            createWeekBreakdownChart(weeklyScore);
+        }
+        
+        function calculateWeeklyTrends(data) {
+            const weeks = {};
+            
+            data.forEach(entry => {
+                const entryDate = parseDate(entry.date);
+                if (!entryDate) return;
+                
+                const weekStart = getWeekStart(entryDate);
+                const weekKey = weekStart.toISOString().split('T')[0];
+                
+                if (!weeks[weekKey]) {
+                    weeks[weekKey] = [];
+                }
+                weeks[weekKey].push(entry);
+            });
+            
+            return Object.keys(weeks)
+                .sort()
+                .slice(-8) // Last 8 weeks
+                .map(weekKey => {
+                    const score = calculateWeeklyScore(weeks[weekKey]);
+                    return {
+                        week: new Date(weekKey).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                        percentage: score.percentage,
+                        completed: score.completed
+                    };
+                });
+        }
+        
+        function calculateStreak(data) {
+            let streak = 0;
+            const today = new Date();
+            today.setHours(12, 0, 0, 0);
+            
+            for (let i = 0; i < data.length; i++) {
+                const entryDate = parseDate(data[i].date);
+                if (!entryDate) continue;
+                
+                const expectedDate = new Date(today);
+                expectedDate.setDate(today.getDate() - i);
+                expectedDate.setHours(12, 0, 0, 0);
+                
+                // Compare just the date parts
+                if (entryDate.toDateString() === expectedDate.toDateString()) {
+                    streak++;
+                } else {
+                    break;
+                }
+            }
+            
+            return streak;
+        }
+        
+        function createWeeklyTrendChart(weeklyScores) {
+            const ctx = document.getElementById('weeklyTrendChart');
+            if (!ctx) return;
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: weeklyScores.map(w => w.week),
+                    datasets: [{
+                        label: 'Weekly Completion %',
+                        data: weeklyScores.map(w => w.percentage),
+                        borderColor: '#9e7f61',
+                        backgroundColor: 'rgba(158, 127, 97, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#9e7f61',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                },
+                                color: '#8a7d75',
+                                font: {
+                                    family: "'Crimson Pro', serif"
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(158, 127, 97, 0.1)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#8a7d75',
+                                font: {
+                                    family: "'Crimson Pro', serif"
+                                }
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function createWeekBreakdownChart(weeklyScore) {
+            const ctx = document.getElementById('weekBreakdownChart');
+            if (!ctx) return;
+
+            const labels = [];
+            const completed = [];
+            const remaining = [];
+
+            for (let key in WEEKLY_GOALS) {
+                const goal = WEEKLY_GOALS[key];
+                const actual = Math.min(weeklyScore.counts[key], goal);
+                const labelMap = {
+                    liftToday: 'Lifting',
+                    heartMath: 'HeartMath',
+                    readToday: 'Reading',
+                    probabilityCourse: 'Course',
+                    instrument: 'Instrument',
+                    gatewayTapes: 'Gateway',
+                    artJournal: 'Art',
+                    gratitude: 'Gratitude'
+                };
+                labels.push(labelMap[key]);
+                completed.push(actual);
+                remaining.push(goal - actual);
+            }
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Completed',
+                            data: completed,
+                            backgroundColor: '#9e7f61'
+                        },
+                        {
+                            label: 'Remaining',
+                            data: remaining,
+                            backgroundColor: 'rgba(158, 127, 97, 0.2)'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#3a3330',
+                                font: {
+                                    family: "'Lora', serif",
+                                    size: 12
+                                },
+                                padding: 15,
+                                usePointStyle: true
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            ticks: {
+                                color: '#8a7d75',
+                                font: {
+                                    family: "'Crimson Pro', serif"
+                                }
+                            },
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#8a7d75',
+                                font: {
+                                    family: "'Crimson Pro', serif"
+                                },
+                                stepSize: 1
+                            },
+                            grid: {
+                                color: 'rgba(158, 127, 97, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Load data on page load
+        loadData();
+        
+        // Refresh every 5 minutes
+        setInterval(loadData, 5 * 60 * 1000);
+    </script>
+</body>
+</html>
