@@ -812,6 +812,18 @@ function statusBadge(status) {
 }
 
 /* ── Trends ───────────────────────────────────────── */
+/* ── Category & hormone ordering constants ─────────── */
+const CATEGORY_ORDER = [
+  'Hormones','Lipids','Metabolic','Blood','Liver',
+  'Kidney','Thyroid','Vitamins','Minerals','Inflammation','Other',
+];
+
+const HORMONE_ORDER = [
+  'Testosterone','Calc Free Testosterone','Calc Bioav Testosterone',
+  'Calc Bioav. Testosterone','Free Androgen Index',
+  'Sex Hormone Binding Globulin','Estradiol','Cortisol','DHEA-S','PSA','Insulin',
+];
+
 /* ── Trend category state ───────────────────────────── */
 let activeTrendCat = null;
 let trendChartInstances = {};
